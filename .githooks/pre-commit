@@ -1,0 +1,19 @@
+#!/bin/sh
+# Keep the repo Prettier-clean so CI's `prettier --check` never fails on a
+# round-trip — it runs before lint/typecheck/test, so a stray format issue burns
+# a whole CI cycle.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+
+# ponytail: checks only staged files, whole-repo check is CI's job
+files=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|js|mjs|cjs|json|md|css)$')
+[ -z "$files" ] && exit 0
+
+if ! npx prettier --check $files; then
+  echo
+  echo "✗ pre-commit: formatting check failed (CI runs the same check)."
+  echo "  Fix with:  npm run format"
+  echo "  then re-stage and commit."
+  exit 1
+fi
