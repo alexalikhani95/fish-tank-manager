@@ -19,9 +19,9 @@
 
 ## Application
 
-| Area            | State          | Last verified |
-| --------------- | -------------- | ------------- |
-| Product plan    | not written    | 2026-09-21    |
-| App             | not scaffolded | 2026-09-21    |
-| CI (PR checks)  | not created    | 2026-09-21    |
-| Deploy pipeline | not created    | 2026-09-21    |
+| Area            | State                                                 | Last verified |
+| --------------- | ----------------------------------------------------- | ------------- |
+| Product plan    | written — PRD, PLAN, CONTEXT, hld, lld, ADR-0002/0003 | 2026-09-21    |
+| App             | not scaffolded                                        | 2026-09-21    |
+| CI (PR checks)  | not created                                           | 2026-09-21    |
+| Deploy pipeline | not created                                           | 2026-09-21    |

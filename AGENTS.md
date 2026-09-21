@@ -1,26 +1,26 @@
 # Fish Tank Manager — agent guide
 
-An app to manage fish tanks. **Product not yet defined** — stack, features, and domain get decided in `PRD.md` / `PLAN.md` / `CONTEXT.md` once written. What exists now is the way of working, copied from `home-manager`.
+Single-user aquarium log: a User owns Tanks and logs WaterChanges and WaterTests against them. Why and what: `PRD.md`. Stack and phases: `PLAN.md`. Vocabulary: `CONTEXT.md`. Way of working copied from `home-manager`; the stack differs where `docs/adr/` says so (Mongo-only, Adonis without Lucid).
 
 ## Scope of this repo
 
-To be decided when the product is planned. Default assumption: monorepo — API, UI, infra, and all docs in one place.
+Monorepo — API (`app/`), PWA (`web/`), infra (`infra/`), and all docs in one place.
 
 ## Status
 
-Not planned, not scaffolded — workflow docs and tooling only. Commands and the directory map below become real once the product is defined and the app exists.
+Planned, not scaffolded — see `docs/status.md`. Commands below become real at scaffold (`PLAN.md` Phase 1, first item).
 
 ## Directory map
 
 ```
 fish-tank-manager/
 ├── AGENTS.md               # You are here — agent entry point (CLAUDE.md imports it)
-├── PRD.md                  # Why & what — problem, users, goals, success, v1 features      (to write)
-├── PLAN.md                 # When — phases, progress, deploy pipeline, cost, roadmap        (to write)
-├── CONTEXT.md              # Domain glossary — the vocabulary to use                       (to write)
+├── PRD.md                  # Why & what — problem, users, goals, success, v1 features
+├── PLAN.md                 # When — phases, progress, deploy pipeline, cost, roadmap
+├── CONTEXT.md              # Domain glossary — the vocabulary to use
 ├── docs/
 │   ├── status.md           # What is LIVE — the only status surface
-│   ├── design/             # Living design — hld.md (how it fits), lld.md (how it's built) (to write)
+│   ├── design/             # Living design — hld.md (how it fits), lld.md (how it's built)
 │   ├── adr/                # Decisions (permanent, numbered; _template.md)
 │   ├── agents/             # How agents work here — workflow, issue tracker
 │   └── conventions/        # How we build — git, …
