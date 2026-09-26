@@ -121,6 +121,7 @@ The API never calls these. The client calls `to*` before submit and `from*` on d
 - Validators under `app/validators/` (VineJS), one per request shape; `readings` validator imports `PARAMETERS`.
 - Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group.
 - S3 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` in `app/services/photo_service.ts`. Bucket and region from env.
+- Runs on Lambda via Lambda Web Adapter (ADR-0004): the same Docker image as local, adapter copied into `/opt/extensions/`, readiness check on `/api/v1/health`. The Mongo connection opened at boot is reused across warm invocations.
 - Env validated at boot in `start/env.ts` (`MONGO_URL`, `APP_KEY`, `JWT_SECRET`, `PHOTOS_BUCKET`, `AWS_REGION`, …).
 - Tests: Japa. Unit for conversion and readings validation; functional (HTTP) against a Testcontainers Mongo, one container per test run, database dropped between suites. S3 calls stubbed in tests (presigner is pure — no network).
 - `web/`: Vite + React + TypeScript, `vite-plugin-pwa`, Recharts for trends, the shared conversion module and `PARAMETERS` imported (or copied until a shared package exists).

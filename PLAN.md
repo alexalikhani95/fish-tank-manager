@@ -25,8 +25,8 @@ A new feature touches `PRD.md` (what), `hld.md`/`lld.md` (how), and a Phase here
 - **DB**: **MongoDB only** via Mongoose (Atlas free M0). No relational database — ADR-0002
 - **Auth**: custom JWT guard for `@adonisjs/auth` backed by Mongoose — ADR-0003
 - **Photos**: S3, presigned upload and read URLs
-- **Compute**: **ECS on EC2 launch type** (`t4g.micro`)
-- **Infra**: AWS (ECS-on-EC2, S3, CloudFront) + MongoDB Atlas — Terraform
+- **Compute**: **AWS Lambda** — the API's Docker image via Lambda Web Adapter, behind CloudFront, always on at no cost — ADR-0004
+- **Infra**: AWS (Lambda, ECR, S3, CloudFront, Parameter Store) + MongoDB Atlas — Terraform
 - **CI/CD**: GitHub Actions
 - **Observability**: Pino, CloudWatch, Sentry
 - **Testing**: Japa (unit + HTTP), Testcontainers (real MongoDB), Playwright (e2e, Phase 2)
@@ -64,14 +64,14 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 
 **Goal: production-shaped deployment and monitoring. A copy of `home-manager`'s Phase 3 minus RDS, SQS, and SES.**
 
-- [ ] Terraform modules: network (public subnet, no NAT), ECS cluster on EC2 `t4g.micro`, S3 (frontend bucket + photos bucket) + CloudFront — one root per environment (`infra/envs/staging`, `infra/envs/prod`) sharing the same modules
+- [ ] Terraform modules: Lambda (container image, function URL, reserved concurrency), S3 (frontend bucket + photos bucket) + CloudFront (`/*` → PWA bucket, `/api/*` → function URL) — one root per environment (`infra/envs/staging`, `infra/envs/prod`) sharing the same modules
 - [ ] Remote state (S3 backend + DynamoDB lock), separate state key per environment
 - [ ] MongoDB Atlas free M0 cluster; one cluster, two databases (`fishtank_staging`, `fishtank_prod`)
 - [ ] ECR lifecycle rule: keep last 10 images
-- [ ] `terraform apply` before a session, `terraform destroy` after — nightly scheduled workflow destroys staging; prod destroyed manually when not demoing
+- [ ] Both environments stay up — idle Lambda costs nothing, so there is nothing to destroy (ADR-0004)
 - [ ] Deploy pipeline (see below)
 - [ ] Pino structured logging with request IDs; CloudWatch metrics; Sentry
-- [ ] Secrets via AWS Secrets Manager (`MONGO_URL`, `APP_KEY`, JWT secret)
+- [ ] Secrets via SSM Parameter Store `SecureString` (`MONGO_URL`, `APP_KEY`, JWT secret)
 - [ ] E2E browser tests (Playwright) — a handful of critical flows only (sign up → create tank → log change → log test → see trend). Run on PR against a local API + Testcontainers Mongo; later reused as the post-deploy smoke test against staging
 
 ### Deploy pipeline
@@ -80,8 +80,8 @@ Fully separate infra from `home-manager` and `wedding-manager` (own Terraform, o
 
 One GitHub Actions workflow on push to `main`:
 
-1. **Build** — lint, typecheck, tests. Build API Docker image tagged with the commit SHA, push to ECR. Build frontend bundle as a workflow artifact. Nothing environment-specific baked in; config arrives via env vars / Secrets Manager at runtime.
-2. **Deploy staging** (automatic) — `terraform apply` staging root, point ECS service at `:<sha>`, sync frontend to staging bucket, smoke test (`/health` + one real endpoint).
+1. **Build** — lint, typecheck, tests. Build API Docker image tagged with the commit SHA, push to ECR. Build frontend bundle as a workflow artifact. Nothing environment-specific baked in; config arrives via env vars / Parameter Store at runtime.
+2. **Deploy staging** (automatic) — `terraform apply` staging root, update the Lambda function to `:<sha>`, sync frontend to staging bucket, smoke test (`/health` + one real endpoint).
 3. **Deploy prod** (gated) — job targets GitHub Environment `production` with required reviewer; workflow pauses until approved. Same steps, prod root, **same image** — no rebuild.
 4. **Tag** (automatic, after prod succeeds) — create `vX.Y.Z` git tag on that SHA + GitHub Release with auto-generated notes. Record of "what's in prod", not a trigger.
 
@@ -96,16 +96,16 @@ Requires a **public repo** (GitHub Environment approval gates are Pro-only on pr
 **Goal: the things a keeper wants after a month of use.**
 
 - [ ] SES — verified sender, sandbox exit; then email verification on sign-up and password reset
-- [ ] Water-change reminders — per-tank interval ("every 14 days"); scheduled `ace` command finds overdue tanks → email, later web push to the installed PWA
+- [ ] Water-change reminders — per-tank interval ("every 14 days"); EventBridge schedule invokes the API, which finds overdue tanks → email, later web push to the installed PWA
 - [ ] One AI feature — e.g. read a test-strip photo into a WaterTest, or "is this tank overstocked?" from its fish list and volume
 
 ---
 
 ## Cost Management
 
-Same AWS account and credit pool as `home-manager` and `wedding-manager`; their `PLAN.md` → Cost Management holds the credit balance, budget, and the account-level alarms. Rules carried over: Upstash-style free tiers over managed AWS services, ECS-on-EC2 over Fargate, public subnet over NAT Gateway, staging destroyed nightly, prod up only for demos.
+Same AWS account and credit pool as `home-manager` and `wedding-manager`; their `PLAN.md` → Cost Management holds the credit balance, budget, and the account-level alarms. Rules carried over: Upstash-style free tiers over managed AWS services, no NAT Gateway. Rule of this project: Lambda over always-on compute (ADR-0004).
 
-Estimated on-demand cost per environment, always-on: EC2 `t4g.micro` ~$6, Secrets Manager ~$2, ECR/S3/CloudFront/CloudWatch ~$2 → **~$10/month per environment**, and near zero with the destroy rules. Atlas M0 is free; no RDS is the single biggest saving versus `home-manager` (ADR-0002). Photos: S3 free tier covers 5 GB — thousands of tank photos.
+Estimated cost per environment, always on: Lambda, CloudFront, Parameter Store and CloudWatch Logs inside AWS's always-free tiers at one keeper's traffic; ECR image storage is cents → **~$0/month per environment**. Atlas M0 is free; no RDS is the single biggest saving versus `home-manager` (ADR-0002). Photos: S3 free tier covers 5 GB — thousands of tank photos.
 
 Alarm state and what is actually provisioned: `docs/status.md`.
 

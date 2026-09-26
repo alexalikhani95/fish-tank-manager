@@ -9,7 +9,7 @@ _Living document._ Components, boundaries, core flows, cross-cutting rules. Reco
 ┌──────────────┐    HTTPS     ┌────────────────────────────────────────────┐
 │ React + Vite │ ───────────▶ │ CloudFront + S3 (static PWA bundle)        │
 │ vite-plugin- │              │                                            │
-│ pwa (SW,     │    /api/v1   │ ECS on EC2 t4g.micro                       │
+│ pwa (SW,     │    /api/v1   │ CloudFront /api/* → Lambda (ADR-0004)      │
 │ manifest)    │ ───────────▶ │  └─ api — AdonisJS (JWT guard, REST)       │
 │              │              │                                            │
 │              │  presigned   │ S3 photos bucket (private)                 │
@@ -75,10 +75,10 @@ One service call: delete the Tank, its WaterChanges, its WaterTests, and its S3 
 
 **Derived, never stored.** Last water change, last test, litres replaced by a water change, trends, gallons, °F. Anything computable from the log is computed.
 
-**Background work.** None in v1. Phase 3 reminders run as a scheduled `ace` command, not a queue.
+**Background work.** None in v1. Phase 3 reminders run as an EventBridge schedule invoking the API's Lambda, not a queue (ADR-0004).
 
 **Observability (Phase 2).** Pino structured logs with request IDs; CloudWatch metrics; Sentry. Health: `GET /api/v1/health` → `{ status, database }`.
 
 ## Deployment
 
-Two environments, **staging** and **prod**, fully separate Terraform roots sharing modules. **Build once, promote the artifact**: one workflow on push to `main` builds the API image tagged with the commit SHA, deploys staging automatically, waits for a manual approval (GitHub Environment `production`), deploys the _same image_ to prod, then tags a release. Rollback = redeploy the previous SHA. Staging is destroyed nightly; prod is up only when needed. Full sequence and the cost reasoning: `PLAN.md` → Deploy pipeline, Cost Management. Present state of each environment: `docs/status.md`.
+Two environments, **staging** and **prod**, fully separate Terraform roots sharing modules. **Build once, promote the artifact**: one workflow on push to `main` builds the API image tagged with the commit SHA, deploys staging automatically, waits for a manual approval (GitHub Environment `production`), deploys the _same image_ to prod, then tags a release. Rollback = redeploy the previous SHA. Both stay up: the API runs on Lambda, which costs nothing while idle (ADR-0004). Full sequence and the cost reasoning: `PLAN.md` → Deploy pipeline, Cost Management. Present state of each environment: `docs/status.md`.
