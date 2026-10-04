@@ -20,10 +20,10 @@ A new feature touches `PRD.md` (what), `hld.md`/`lld.md` (how), and a Phase here
 
 ## Tech Stack
 
-- **Frontend**: React + TypeScript (Vite), **mobile-first PWA** via `vite-plugin-pwa`. No app store. Charts: Recharts. Escalation path if ever needed: Capacitor → React Native (Stretch); the API is plain REST so neither touches the backend.
+- **Frontend**: React + TypeScript (Vite), **mobile-first PWA** via `vite-plugin-pwa`. No app store. Styling: Tailwind v4 + **shadcn/ui** where a component earns its place — ADR-0005. Routing: `react-router`. Server state: TanStack Query over a thin `fetch` wrapper. Charts: Recharts. Escalation path if ever needed: Capacitor → React Native (Stretch); the API is plain REST so neither touches the backend.
 - **Backend**: Node.js + TypeScript — **AdonisJS** (slim starter, no Lucid) — ADR-0003
 - **DB**: **MongoDB only** via Mongoose (Atlas free M0). No relational database — ADR-0002
-- **Auth**: custom JWT guard for `@adonisjs/auth` backed by Mongoose — ADR-0003
+- **Auth**: custom JWT guard for `@adonisjs/auth` backed by Mongoose — ADR-0003; token in an httpOnly cookie, bearer fallback — ADR-0006
 - **Photos**: S3, presigned upload and read URLs
 - **Compute**: **AWS Lambda** — the API's Docker image via Lambda Web Adapter, behind CloudFront, always on at no cost — ADR-0004
 - **Infra**: AWS (Lambda, ECR, S3, CloudFront, Parameter Store) + MongoDB Atlas — Terraform
@@ -42,9 +42,9 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 **Goal: a working app, properly tested, installed on the keeper's phone and in daily use for their own tanks.**
 
 - [ ] Scaffold: `app/` (AdonisJS slim + Mongoose provider) and `web/` (Vite React PWA); root `npm run dev|test|lint|format|typecheck`; fill in `AGENTS.md` → Commands
-- [ ] Auth: register / login / `GET /me`, custom JWT guard over Mongoose (ADR-0003), 30-day tokens, password hashed with Adonis `hash`; `PATCH /me` for `volumeUnit` and `temperatureUnit`
+- [ ] Auth: register / login / logout / `GET /me`, custom JWT guard over Mongoose (ADR-0003), 30-day tokens in an httpOnly `SameSite=Lax` cookie with bearer fallback and a `tokenVersion` revocation check (ADR-0006), password hashed with Adonis `hash` (min 12 chars), `REGISTRATION_OPEN` closing signup once the keeper's account exists, `user:set-password` ace command for recovery; `PATCH /me` for `volumeUnit` and `temperatureUnit`
 - [ ] Tanks CRUD — `Tank` with embedded `fish[]` and `plants[]`; every query scoped by `userId`; foreign tank → 404; delete cascades WaterChanges, WaterTests, and the S3 object
-- [ ] Photo — `POST /tanks/:tankId/photo` returns a presigned PUT; confirm stores the key; tank responses carry a short-lived presigned GET. 10 MB, jpeg/png/webp/heic
+- [ ] Photo — client re-encodes the picked image to JPEG at max 1600px before upload (see `lld.md` → Photo pipeline); `POST /tanks/:tankId/photo` returns a presigned PUT; confirm stores the key; tank responses carry a short-lived presigned GET. Allowlist `image/jpeg`, `image/png`, `image/webp`; 10 MB on the picked file
 - [ ] Water changes — create / edit / delete; list per tank newest first; tank summary exposes `lastWaterChangeAt` (derived)
 - [ ] Water tests — `PARAMETERS` constant (8 parameters, one unit each); `readings` map validated against it; create / edit / delete; list per tank; tank summary exposes `lastWaterTestAt` (derived); `GET …/trend?parameter=` for charts
 - [ ] Unit conversion — one shared module (litres ↔ US/UK gallons, °C ↔ °F), unit-tested; API stores canonical, client converts at the edge
@@ -64,11 +64,13 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 
 **Goal: production-shaped deployment and monitoring. A copy of `home-manager`'s Phase 3 minus RDS, SQS, and SES.**
 
-- [ ] Terraform modules: Lambda (container image, function URL, reserved concurrency), S3 (frontend bucket + photos bucket) + CloudFront (`/*` → PWA bucket, `/api/*` → function URL) — one root per environment (`infra/envs/staging`, `infra/envs/prod`) sharing the same modules
+- [ ] Terraform modules: Lambda (container image, function URL, reserved concurrency), S3 (frontend bucket + photos bucket) + CloudFront (`/*` → PWA bucket, `/api/*` → function URL, forwarding the `Cookie` header and caching no authenticated response — ADR-0006) — one root per environment (`infra/envs/staging`, `infra/envs/prod`) sharing the same modules
 - [ ] Remote state (S3 backend + DynamoDB lock), separate state key per environment
-- [ ] MongoDB Atlas free M0 cluster; one cluster, two databases (`fishtank_staging`, `fishtank_prod`)
+- [ ] MongoDB Atlas free M0 cluster; one cluster, two databases (`fishtank_staging`, `fishtank_prod`). **M0 has no automated backups** — losing the prod database loses the log, which is the one thing `PRD.md` → Success criteria depends on
+- [ ] Nightly backup: a scheduled GitHub Actions job runs `mongodump` against prod and writes the archive to S3 with a lifecycle rule keeping 30 days. Restore is `mongorestore` from the newest archive; the job fails loudly if the dump is empty
 - [ ] ECR lifecycle rule: keep last 10 images
 - [ ] Both environments stay up — idle Lambda costs nothing, so there is nothing to destroy (ADR-0004)
+- [ ] Make the repo public — decided 2026-09-28, to be done before the deploy pipeline lands (the prod approval gate needs it; see below). Present visibility: `docs/status.md`
 - [ ] Deploy pipeline (see below)
 - [ ] Pino structured logging with request IDs; CloudWatch metrics; Sentry
 - [ ] Secrets via SSM Parameter Store `SecureString` (`MONGO_URL`, `APP_KEY`, JWT secret)
@@ -87,7 +89,7 @@ One GitHub Actions workflow on push to `main`:
 
 Rollback = re-run the prod job with the previous SHA; image is still in ECR.
 
-Requires a **public repo** (GitHub Environment approval gates are Pro-only on private). Fine — it's a portfolio project. PR checks (lint/typecheck/test) are a separate workflow from Phase 1.
+Requires a **public repo** (GitHub Environment approval gates are Pro-only on private). Fine — it's a portfolio project; the repo stays private until then and goes public before this pipeline lands. PR checks (lint/typecheck/test) are a separate workflow from Phase 1.
 
 ---
 
@@ -118,6 +120,7 @@ Alarm state and what is actually provisioned: `docs/status.md`.
 - [ ] Multiple photos per tank, photo per WaterTest
 - [ ] Equipment and maintenance log (filter media, heater, lights) with intervals
 - [ ] Feeding and dosing log
+- [ ] Offline logging — an IndexedDB outbox that replays failed writes on reconnect; needs idempotency keys on POST and a "pending" indicator
 - [ ] User-defined Parameters
 - [ ] Capacitor wrapper if a native API is needed; React Native + App Store if this becomes a product for other people
 
@@ -125,4 +128,4 @@ Alarm state and what is actually provisioned: `docs/status.md`.
 
 ## Open Questions
 
-None right now — all v1 decisions settled in the 2026-09-21 planning session. Add here as new features come up.
+None right now. All v1 decisions were settled in the 2026-09-21 planning session, and the frontend and auth gaps it left open were settled on 2026-09-28 (ADR-0005, ADR-0006, plus the routing, server-state, offline, photo, date-bound and auth-hardening notes in `docs/design/lld.md`). Add here as new features come up.
