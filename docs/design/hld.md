@@ -39,16 +39,17 @@ No worker, queue, cache, or email service in v1. Stack choices and reasons: `PLA
 
 **Sign up → first tank**
 
-1. `POST auth/register` (email + password) → JWT. Same JWT from `POST auth/login`.
+1. `POST auth/register` (email + password) → the JWT arrives as an httpOnly cookie (ADR-0006). Same from `POST auth/login`.
 2. `POST /tanks` with name and `volumeLitres` (client already converted) → Tank owned by the caller.
-3. Every later request carries the JWT; every tank-scoped handler loads the Tank by `(id, userId)` and 404s if absent.
+3. Every later request carries the cookie; every tank-scoped handler loads the Tank by `(id, userId)` and 404s if absent.
 
 **Add a photo**
 
-1. `POST /tanks/:tankId/photo` `{ contentType, size }` → validated → `{ uploadUrl, key }` (presigned PUT, 5-minute TTL).
-2. Client PUTs the bytes straight to S3.
-3. `PUT /tanks/:tankId/photo` `{ key }` → API `HEAD`s the object to confirm it exists, stores `photoKey`, deletes the previous object if any.
-4. Tank reads return `photoUrl` — a presigned GET, 1-hour TTL, generated per response.
+1. The client re-encodes the picked image to JPEG at max 1600px (`lld.md` → Photo pipeline), so only JPEG bytes ever reach S3.
+2. `POST /tanks/:tankId/photo` `{ contentType, size }` → validated → `{ uploadUrl, key }` (presigned PUT, 5-minute TTL).
+3. Client PUTs the bytes straight to S3.
+4. `PUT /tanks/:tankId/photo` `{ key }` → API `HEAD`s the object to confirm it exists, stores `photoKey`, deletes the previous object if any.
+5. Tank reads return `photoUrl` — a presigned GET, 1-hour TTL, generated per response.
 
 **Log a water change**
 
@@ -69,9 +70,9 @@ One service call: delete the Tank, its WaterChanges, its WaterTests, and its S3 
 
 **Ownership.** Single-user: there is no tenant above the User. Every tank-owned document carries `userId` alongside `tankId`. A tank-scoped route loads the Tank by `(tankId, userId)` first; **a Tank that isn't the caller's returns 404, never 403** — the caller must not learn it exists. 403 is unused in v1 (no roles). If sharing ever arrives, the tenant slots in between User and Tank (`PLAN.md` → Stretch).
 
-**Auth.** Custom JWT guard registered with `@adonisjs/auth` (ADR-0003). HS256, 30-day expiry, secret from env. Token stored client-side. No sessions, cookies, refresh tokens, or token table — the API is stateless. Logout is the client discarding the token.
+**Auth.** Custom JWT guard registered with `@adonisjs/auth` (ADR-0003). HS256, 30-day expiry, secret from env. The token is delivered as an `httpOnly; Secure; SameSite=Lax` cookie and the guard falls back to an `Authorization: Bearer` header for future native clients (ADR-0006). No sessions, refresh tokens, or token table — the API stays stateless. `POST auth/logout` clears the cookie; a `tokenVersion` claim checked against `User.tokenVersion` revokes every token a User holds. CSRF: `SameSite=Lax` plus a JSON-only API, no CSRF token in v1.
 
-**Validation.** VineJS at every request boundary. `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
+**Validation.** VineJS at every request boundary. Registration closes behind `REGISTRATION_OPEN` once the keeper's account exists (`lld.md` → Auth hardening). `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
 
 **Derived, never stored.** Last water change, last test, litres replaced by a water change, trends, gallons, °F. Anything computable from the log is computed.
 

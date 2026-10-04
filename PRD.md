@@ -34,4 +34,4 @@ Vocabulary for all of the above: `CONTEXT.md`.
 
 ## Not in v1
 
-Sharing a tank with another person, species catalogue / autocomplete, water-change reminders, email verification and password reset (both need outbound email — Phase 3), multiple photos per tank, equipment and maintenance log (filter media, heater), feeding and dosing log, user-defined parameters. Roadmap for these lives in `PLAN.md` → Phase 3 and Stretch / Later.
+Sharing a tank with another person, species catalogue / autocomplete, water-change reminders, email verification and password reset (both need outbound email — Phase 3), multiple photos per tank, equipment and maintenance log (filter media, heater), feeding and dosing log, user-defined parameters, offline logging (the installed app opens without a connection because its shell is cached, but logging a water change or test needs one). Roadmap for these lives in `PLAN.md` → Phase 3 and Stretch / Later.
