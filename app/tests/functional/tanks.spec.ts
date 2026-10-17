@@ -21,13 +21,13 @@ test.group('Tanks', (group) => {
   test('rejects a tank with no name', async ({ client }) => {
     const response = await client.post('/api/v1/tanks').json({ volumeLitres: 30 })
 
-    response.assertStatus(422)
+    response.assertStatus(400)
   })
 
   test('rejects a volume of zero', async ({ client }) => {
     const response = await client.post('/api/v1/tanks').json({ name: 'Nano', volumeLitres: 0 })
 
-    response.assertStatus(422)
+    response.assertStatus(400)
   })
 
   test('lists only the current user tanks, newest first', async ({ client, assert }) => {

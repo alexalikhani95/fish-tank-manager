@@ -72,7 +72,7 @@ One service call: delete the Tank, its WaterChanges, its WaterTests, and its S3 
 
 **Auth.** Custom JWT guard registered with `@adonisjs/auth` (ADR-0003). HS256, 30-day expiry, secret from env. The token is delivered as an `httpOnly; Secure; SameSite=Lax` cookie and the guard falls back to an `Authorization: Bearer` header for future native clients (ADR-0006). No sessions, refresh tokens, or token table — the API stays stateless. `POST auth/logout` clears the cookie; a `tokenVersion` claim checked against `User.tokenVersion` revokes every token a User holds. CSRF: `SameSite=Lax` plus a JSON-only API, no CSRF token in v1.
 
-**Validation.** VineJS at every request boundary. Registration closes behind `REGISTRATION_OPEN` once the keeper's account exists (`lld.md` → Auth hardening). `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
+**Validation.** Zod at every request boundary (ADR-0007). Registration closes behind `REGISTRATION_OPEN` once the keeper's account exists (`lld.md` → Auth hardening). `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
 
 **Derived, never stored.** Last water change, last test, litres replaced by a water change, trends, gallons, °F. Anything computable from the log is computed.
 

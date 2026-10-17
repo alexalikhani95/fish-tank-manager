@@ -58,9 +58,9 @@
     "@adonisjs/core": "^7.5.2",
     "@adonisjs/cors": "^3.0.0",
     "@japa/api-client": "^3.2.1",
-    "@vinejs/vine": "^4.4.0",
     "mongoose": "^9.11.1",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "zod": "^4.6.7"
   },
   "hotHook": {
     "boundaries": [

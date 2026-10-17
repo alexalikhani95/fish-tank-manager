@@ -1,6 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { Tank } from '#models/tank'
-import { createTankValidator, updateTankValidator } from '#validators/tank_validator'
+import { createTankSchema, updateTankSchema } from '#validators/tank_validator'
 
 /**
  * Every query filters on userId as well as the tank's own id. A Tank that is not
@@ -15,7 +15,7 @@ export default class TanksController {
 
   /** POST /api/v1/tanks */
   async store({ request, response, userId }: HttpContext) {
-    const payload = await request.validateUsing(createTankValidator)
+    const payload = createTankSchema.parse(request.body())
     const tank = await Tank.create({ ...payload, userId })
     return response.created(tank)
   }
@@ -29,7 +29,7 @@ export default class TanksController {
 
   /** PATCH /api/v1/tanks/:id */
   async update({ params, request, response, userId }: HttpContext) {
-    const payload = await request.validateUsing(updateTankValidator)
+    const payload = updateTankSchema.parse(request.body())
     const tank = await Tank.findOneAndUpdate({ _id: params.id, userId }, payload, {
       returnDocument: 'after',
     })

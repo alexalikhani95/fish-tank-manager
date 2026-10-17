@@ -112,12 +112,12 @@ The API never calls these. The client calls `to*` before submit and `from*` on d
 **Auth hardening.** Three rules, no rate limiter:
 
 - `REGISTRATION_OPEN` (env, boolean). `POST auth/register` returns 403 when it is false. It stays true only until the keeper has created their account on each environment, then it is flipped off for good — a closed endpoint beats a throttled one, and this app has exactly one intended User.
-- Password minimum 12 characters, checked in the VineJS validator. Length only: no forced symbols or capitals, per current guidance.
+- Password minimum 12 characters, checked in the Zod schema. Length only: no forced symbols or capitals, per current guidance.
 - `node ace user:set-password <email>` for recovery, because `PRD.md` puts password reset out of v1 — without it a forgotten password means editing the database by hand.
 
 No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-memory counter throttles per container rather than globally; a real limit means a Mongo write on every attempt, to guard the one password that can exist once registration is closed. Revisit if the app ever serves more than one keeper.
 
-**Readings validation.** `readings` is an object; every key must be in `PARAMETERS`; every value a finite number ≥ 0 (pH and salinity too — no negative readings exist); at least one key present. Unknown key → 400 naming the key. Enforced in the VineJS validator; the Mongoose schema repeats the key whitelist.
+**Readings validation.** `readings` is an object; every key must be in `PARAMETERS`; every value a finite number ≥ 0 (pH and salinity too — no negative readings exist); at least one key present. Unknown key → 400 naming the key. Enforced in the Zod schema; the Mongoose schema repeats the key whitelist.
 
 **Trend.** `find({ tankId, userId, [`readings.${p}`]: { $exists: true } }, { at, [`readings.${p}`] }).sort({ at: 1 })`. Returns `[{ at, value }]`. Client charts it; temperature converted on the client like any other display.
 
@@ -130,7 +130,7 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 - AdonisJS **slim** starter — no Lucid, no `@adonisjs/session`. `@adonisjs/auth` kept for the guard contract only (ADR-0003).
 - Mongoose registered as an Adonis provider (`providers/mongo_provider.ts`): one connection opened at boot from `MONGO_URL`, closed on shutdown; models under `app/models/` as Mongoose schemas.
 - JWT guard under `app/auth/guards/jwt.ts` implementing `GuardContract`: reads the `token` cookie, else the `Authorization: Bearer` header (ADR-0006), verifies HS256, then loads the User via `app/auth/user_provider.ts` and rejects if the JWT's `tokenVersion` no longer matches the User's. Registered in `config/auth.ts` as the default guard.
-- Validators under `app/validators/` (VineJS), one per request shape; `readings` validator imports `PARAMETERS`.
+- Validators under `app/validators/` as Zod schemas, one per request shape (ADR-0007); a `ZodError` becomes a 400 in `app/exceptions/handler.ts`; `readings` validator imports `PARAMETERS`.
 - Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group.
 - S3 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` in `app/services/photo_service.ts`. Bucket and region from env.
 - Runs on Lambda via Lambda Web Adapter (ADR-0004): the same Docker image as local, adapter copied into `/opt/extensions/`, readiness check on `/api/v1/health`. The Mongo connection opened at boot is reused across warm invocations.
