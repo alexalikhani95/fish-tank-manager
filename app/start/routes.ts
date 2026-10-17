@@ -8,7 +8,7 @@
 */
 
 import router from '@adonisjs/core/services/router'
-import { connection } from 'mongoose'
+import mongoose from 'mongoose'
 import { controllers } from '#generated/controllers'
 import { middleware } from '#start/kernel'
 
@@ -16,7 +16,7 @@ router
   .group(() => {
     router.get('health', () => ({
       status: 'ok',
-      database: connection.readyState === 1 ? 'connected' : 'disconnected',
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     }))
 
     router
