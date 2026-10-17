@@ -1,0 +1,22 @@
+{
+  "name": "fish-tank-manager",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace app",
+    "test": "npm run test --workspace app",
+    "lint": "npm run lint --workspace app",
+    "format": "prettier --write .",
+    "typecheck": "npm run typecheck --workspace app",
+    "db": "docker compose up -d",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9"
+  }
+}

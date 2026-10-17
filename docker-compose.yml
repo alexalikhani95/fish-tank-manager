@@ -1,0 +1,12 @@
+# Local development database. Tests use the same server, a different database.
+# Production is MongoDB Atlas (ADR-0002) — this file never runs there.
+services:
+  mongo:
+    image: mongo:8
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

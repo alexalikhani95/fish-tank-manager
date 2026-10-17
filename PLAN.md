@@ -41,7 +41,7 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 
 **Goal: a working app, properly tested, installed on the keeper's phone and in daily use for their own tanks.**
 
-- [ ] Scaffold: `app/` (AdonisJS slim + Mongoose provider) and `web/` (Vite React PWA); root `npm run dev|test|lint|format|typecheck`; fill in `AGENTS.md` → Commands
+- [~] Scaffold: `app/` done — AdonisJS **7** (`api` starter with Lucid, auth, session and shield stripped; there is no slim kit for v7 — amends ADR-0003's "slim starter" wording), Mongoose provider, root npm workspaces, `AGENTS.md` → Commands filled in. `web/` (Vite React PWA) still to do
 - [ ] Auth: register / login / logout / `GET /me`, custom JWT guard over Mongoose (ADR-0003), 30-day tokens in an httpOnly `SameSite=Lax` cookie with bearer fallback and a `tokenVersion` revocation check (ADR-0006), password hashed with Adonis `hash` (min 12 chars), `REGISTRATION_OPEN` closing signup once the keeper's account exists, `user:set-password` ace command for recovery; `PATCH /me` for `volumeUnit` and `temperatureUnit`
 - [ ] Tanks CRUD — `Tank` with embedded `fish[]` and `plants[]`; every query scoped by `userId`; foreign tank → 404; delete cascades WaterChanges, WaterTests, and the S3 object
 - [ ] Photo — client re-encodes the picked image to JPEG at max 1600px before upload (see `lld.md` → Photo pipeline); `POST /tanks/:tankId/photo` returns a presigned PUT; confirm stores the key; tank responses carry a short-lived presigned GET. Allowlist `image/jpeg`, `image/png`, `image/webp`; 10 MB on the picked file

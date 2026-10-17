@@ -52,7 +52,18 @@ fish-tank-manager/
 
 ## Commands
 
-To be filled in at scaffold. Convention: `npm run dev`, `npm test`, `npm run lint`, `npm run format`, `npm run typecheck`. Before claiming work is done: typecheck, lint, and tests all green.
+Run from the repo root (npm workspaces; `app/` is the API, `web/` is not scaffolded yet).
+
+| Command             | Does                                                    |
+| ------------------- | ------------------------------------------------------- |
+| `npm run db`        | starts MongoDB for development (`docker compose up -d`) |
+| `npm run dev`       | API on http://localhost:3333 — needs `npm run db` first |
+| `npm test`          | Japa tests against the `fishtank_test` database         |
+| `npm run lint`      | ESLint (Prettier runs inside it)                        |
+| `npm run format`    | Prettier, writing in place                              |
+| `npm run typecheck` | `tsc --noEmit`                                          |
+
+Before claiming work is done: typecheck, lint, and tests all green.
 
 ## Dev flow
 
