@@ -1,1 +1,4 @@
 .worktrees/
+
+# Adonis codegen output — regenerated on boot
+app/.adonisjs/

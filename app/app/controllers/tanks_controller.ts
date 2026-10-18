@@ -1,0 +1,49 @@
+import type { HttpContext } from '@adonisjs/core/http'
+import { Tank } from '#models/tank'
+import { createTankSchema, updateTankSchema } from '#validators/tank_validator'
+
+/**
+ * Every query filters on userId as well as the tank's own id. A Tank that is not
+ * the caller's is a 404, never a 403 — the caller must not learn it exists
+ * (docs/design/hld.md → Ownership).
+ */
+export default class TanksController {
+  /** GET /api/v1/tanks */
+  async index({ userId }: HttpContext) {
+    return Tank.find({ userId }).sort({ createdAt: -1, _id: -1 })
+  }
+
+  /** POST /api/v1/tanks */
+  async store({ request, response, userId }: HttpContext) {
+    const payload = createTankSchema.parse(request.body())
+    const tank = await Tank.create({ ...payload, userId })
+    return response.created(tank)
+  }
+
+  /** GET /api/v1/tanks/:tankId */
+  async show({ params, response, userId }: HttpContext) {
+    const tank = await Tank.findOne({ _id: params.tankId, userId })
+    if (!tank) return response.notFound({ message: 'Tank not found' })
+    return tank
+  }
+
+  /** PATCH /api/v1/tanks/:tankId */
+  async update({ params, request, response, userId }: HttpContext) {
+    const payload = updateTankSchema.parse(request.body())
+    const tank = await Tank.findOneAndUpdate({ _id: params.tankId, userId }, payload, {
+      returnDocument: 'after',
+      runValidators: true,
+    })
+    if (!tank) return response.notFound({ message: 'Tank not found' })
+    return tank
+  }
+
+  /** DELETE /api/v1/tanks/:tankId */
+  async destroy({ params, response, userId }: HttpContext) {
+    const tank = await Tank.findOneAndDelete({ _id: params.tankId, userId })
+    if (!tank) return response.notFound({ message: 'Tank not found' })
+    // Cascading WaterChanges, WaterTests and the S3 photo comes with those
+    // features (docs/design/lld.md → Cascade delete).
+    return response.noContent()
+  }
+}
