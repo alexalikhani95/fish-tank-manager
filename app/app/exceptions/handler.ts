@@ -15,24 +15,19 @@ export default class HttpExceptionHandler extends ExceptionHandler {
    */
   async handle(error: unknown, ctx: HttpContext) {
     // A failed request schema is a 400 naming each bad field (docs/design/lld.md → API).
+    // An unknown key is reported against that key; a whole-body rule has field ''.
     if (error instanceof ZodError) {
       return ctx.response.badRequest({
-        errors: error.issues.map((issue) => ({
-          field: issue.path.join('.'),
-          message: issue.message,
-        })),
+        errors: error.issues.flatMap((issue) =>
+          issue.code === 'unrecognized_keys'
+            ? issue.keys.map((key) => ({
+                field: [...issue.path, key].join('.'),
+                message: 'Unknown field',
+              }))
+            : [{ field: issue.path.join('.'), message: issue.message }]
+        ),
       })
     }
     return super.handle(error, ctx)
-  }
-
-  /**
-   * The method is used to report error to the logging service or
-   * the a third party error monitoring service.
-   *
-   * @note You should not attempt to send a response from this method.
-   */
-  async report(error: unknown, ctx: HttpContext) {
-    return super.report(error, ctx)
   }
 }

@@ -18,10 +18,14 @@ test.group('Tanks', (group) => {
     assert.equal(response.body().userId, userId)
   })
 
-  test('rejects a tank with no name', async ({ client }) => {
+  test('rejects a tank with no name, naming the field', async ({ client, assert }) => {
     const response = await client.post('/api/v1/tanks').json({ volumeLitres: 30 })
 
     response.assertStatus(400)
+    assert.deepEqual(
+      response.body().errors.map((error: { field: string }) => error.field),
+      ['name']
+    )
   })
 
   test('rejects a volume of zero', async ({ client }) => {
@@ -80,13 +84,16 @@ test.group('Tanks', (group) => {
     response.assertStatus(400)
   })
 
-  test('rejects an update with a misspelled or empty body', async ({ client }) => {
+  test('rejects an update with a misspelled or empty body', async ({ client, assert }) => {
     const tank = await Tank.create({ name: 'Nano', volumeLitres: 30, userId })
 
     for (const body of [{ volume: 60 }, {}]) {
       const response = await client.patch(`/api/v1/tanks/${tank.id}`).json(body)
       response.assertStatus(400)
     }
+
+    const misspelled = await client.patch(`/api/v1/tanks/${tank.id}`).json({ volume: 60 })
+    assert.deepInclude(misspelled.body().errors, { field: 'volume', message: 'Unknown field' })
   })
 
   test('deletes a tank', async ({ client, assert }) => {
@@ -117,9 +124,7 @@ test.group('Tanks', (group) => {
       response.assertStatus(404)
     }
   })
-})
 
-test.group('Tanks — malformed id', () => {
   test('an id that is not an ObjectId is a 404, not a 500', async ({ client }) => {
     for (const response of [
       await client.get('/api/v1/tanks/abc'),

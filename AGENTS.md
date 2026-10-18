@@ -8,7 +8,7 @@ Monorepo — API (`app/`), PWA (`web/`), infra (`infra/`), and all docs in one p
 
 ## Status
 
-Planned, not scaffolded — see `docs/status.md`. Commands below become real at scaffold (`PLAN.md` Phase 1, first item).
+What exists and what is verified: `docs/status.md`. Phases and what's next: `PLAN.md`.
 
 ## Directory map
 
@@ -52,7 +52,7 @@ fish-tank-manager/
 
 ## Commands
 
-Run from the repo root (npm workspaces; `app/` is the API, `web/` is not scaffolded yet).
+Run from the repo root (npm workspaces; `app/` is the API, `web/` the PWA).
 
 | Command             | Does                                                    |
 | ------------------- | ------------------------------------------------------- |

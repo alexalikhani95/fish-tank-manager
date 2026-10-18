@@ -10,6 +10,7 @@
 */
 
 import { Env } from '@adonisjs/core/env'
+import { isObjectIdOrHexString } from 'mongoose'
 
 export default await Env.create(new URL('../', import.meta.url), {
   // Node
@@ -34,7 +35,7 @@ export default await Env.create(new URL('../', import.meta.url), {
         `${key} is a dev-only stub; the API cannot run in production until the JWT guard lands`
       )
     }
-    if (!value || !/^[0-9a-f]{24}$/i.test(value)) {
+    if (!value || !isObjectIdOrHexString(value)) {
       throw new Error(`${key} must be a 24-character hex ObjectId`)
     }
     return value

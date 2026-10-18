@@ -2,9 +2,9 @@
 
 _Living document._ Collections, routes, algorithms, and framework wiring. Updated by the ticket that changes them. Shape and flows: `hld.md`. Vocabulary: `CONTEXT.md`.
 
-Marked **(planned)** until scaffolded — this is the design, not yet a description of code.
+Sections describe the design, built or not; what exists is in `docs/status.md`.
 
-## Data model — MongoDB (planned)
+## Data model — MongoDB
 
 Mongoose schemas with `timestamps: true` (`createdAt`, `updatedAt`). `_id` is the default ObjectId. Every tank-owned collection carries both `tankId` and `userId`; reads always filter on both. No transactions in v1 (`hld.md` → Delete a tank).
 
@@ -20,16 +20,16 @@ Mongoose schemas with `timestamps: true` (`createdAt`, `updatedAt`). `_id` is th
 
 **tanks**
 
-| field        | type                                 | notes                                              |
-| ------------ | ------------------------------------ | -------------------------------------------------- |
-| userId       | ObjectId → users, indexed            | owner                                              |
-| name         | string, required                     |                                                    |
-| volumeLitres | number > 0                           | canonical; client converts from the preferred unit |
-| brand        | string, optional                     |                                                    |
-| model        | string, optional                     |                                                    |
-| photoKey     | string, optional                     | S3 object key `tanks/<tankId>/photo`               |
-| fish         | `[{ name: string, count: int ≥ 1 }]` | embedded, whole array replaced on edit             |
-| plants       | `[{ name: string }]`                 | embedded, whole array replaced on edit             |
+| field        | type                                  | notes                                              |
+| ------------ | ------------------------------------- | -------------------------------------------------- |
+| userId       | ObjectId → users, indexed             | owner                                              |
+| name         | string, required, trimmed, 1–80 chars |                                                    |
+| volumeLitres | number > 0                            | canonical; client converts from the preferred unit |
+| brand        | string, optional                      |                                                    |
+| model        | string, optional                      |                                                    |
+| photoKey     | string, optional                      | S3 object key `tanks/<tankId>/photo`               |
+| fish         | `[{ name: string, count: int ≥ 1 }]`  | embedded, whole array replaced on edit             |
+| plants       | `[{ name: string }]`                  | embedded, whole array replaced on edit             |
 
 **water_changes**
 
@@ -72,7 +72,7 @@ The upper bound is **UTC today + 1 day**, not UTC today. The client sends the da
 
 Adding a parameter is one row here. The form, the validator, the trend endpoint, and the chart all read from it. `temperature` is the only parameter with a display conversion (°C ↔ °F, per `User.temperatureUnit`).
 
-## API (planned)
+## API
 
 Base `/api/v1`. Authenticated by the JWT cookie — or a bearer header (ADR-0006) — on everything except `auth/*` and `health`. All `tanks/:tankId/*` routes load the Tank by `(tankId, userId)` first — see Ownership in `hld.md`. Lists are small (one keeper's data) and return the full set, newest first; add cursor pagination only when a real tank has more than a few hundred entries.
 
@@ -81,7 +81,7 @@ Base `/api/v1`. Authenticated by the JWT cookie — or a bearer header (ADR-0006
 | POST                 | `auth/register`, `auth/login`     | `{ email, password }` → User; JWT set as an httpOnly cookie (ADR-0006)                                         |
 | POST                 | `auth/logout`                     | clears the cookie                                                                                              |
 | GET / PATCH          | `me`                              | PATCH: `volumeUnit`, `temperatureUnit`                                                                         |
-| GET                  | `health`                          | `{ status, database }`; 503 when Mongo is not connected (readiness check)                                      |
+| GET                  | `health`                          | `{ status, database }`; 503 if the Mongo connection drops after boot (boot itself waits for Mongo)             |
 | GET / POST           | `tanks`                           | GET returns dashboard summaries (see below)                                                                    |
 | GET / PATCH / DELETE | `tanks/:tankId`                   | DELETE cascades; PATCH replaces `fish` / `plants` wholesale                                                    |
 | POST                 | `tanks/:tankId/photo`             | `{ contentType, size }` → `{ uploadUrl, key }`; allowlist `image/jpeg` \| `image/png` \| `image/webp`, ≤ 10 MB |
@@ -121,20 +121,21 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 
 **Trend.** `find({ tankId, userId, [`readings.${p}`]: { $exists: true } }, { at, [`readings.${p}`] }).sort({ at: 1 })`. Returns `[{ at, value }]`. Client charts it; temperature converted on the client like any other display.
 
-**Ownership check.** Route middleware on the `tanks/:tankId` group: `Tank.findOne({ _id: tankId, userId: auth.user.id })` → null → 404 → else `ctx.tank`. Handlers read `ctx.tank`, never re-query by id alone. Child collections are then queried with `{ tankId: ctx.tank.id, userId }` — the second filter is belt-and-braces, cheap because of the index.
+**Ownership check.** (Middleware arrives with the first child route; until then see Framework wiring.) Route middleware on the `tanks/:tankId` group: `Tank.findOne({ _id: tankId, userId: auth.user.id })` → null → 404 → else `ctx.tank`. Handlers read `ctx.tank`, never re-query by id alone. Child collections are then queried with `{ tankId: ctx.tank.id, userId }` — the second filter is belt-and-braces, cheap because of the index.
 
 **Cascade delete.** `deleteMany` on `water_changes` and `water_tests` by `tankId`, `DeleteObject` on `photoKey` if set, then `deleteOne` the Tank. Order: children first so a crash leaves a Tank with no history, not orphans with no Tank.
 
-## Framework wiring (planned)
+## Framework wiring
 
-- AdonisJS 7 `api` starter with Lucid, session and shield removed — v7 has no slim kit (`PLAN.md` → Scaffold). `@adonisjs/auth` returns for the guard contract only (ADR-0003).
+- AdonisJS 7 `api` starter with Lucid, session and shield removed (ADR-0008). `@adonisjs/auth` returns for the guard contract only (ADR-0003).
 - Mongoose registered as an Adonis provider (`providers/mongo_provider.ts`): one connection opened at boot from `MONGO_URL`, closed on shutdown; models under `app/models/` as Mongoose schemas.
 - JWT guard under `app/auth/guards/jwt.ts` implementing `GuardContract`: reads the `token` cookie, else the `Authorization: Bearer` header (ADR-0006), verifies HS256, then loads the User via `app/auth/user_provider.ts` and rejects if the JWT's `tokenVersion` no longer matches the User's. Registered in `config/auth.ts` as the default guard.
 - Validators under `app/validators/` as Zod schemas, one per request shape (ADR-0007); a `ZodError` becomes a 400 in `app/exceptions/handler.ts`; `readings` validator imports `PARAMETERS`.
 - Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group — arrives with the first `tanks/:tankId/*` child route. Until then `TanksController` filters on `{ _id: tankId, userId }` itself. `:tankId` must be 24 hex characters (route matcher), so a malformed id is a 404, not a 500.
 - S3 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` in `app/services/photo_service.ts`. Bucket and region from env.
 - Runs on Lambda via Lambda Web Adapter (ADR-0004): the same Docker image as local, adapter copied into `/opt/extensions/`, readiness check on `/api/v1/health`. The Mongo connection opened at boot is reused across warm invocations.
-- Env validated at boot in `start/env.ts` (`MONGO_URL`, `APP_KEY`, `JWT_SECRET`, `PHOTOS_BUCKET`, `AWS_REGION`, `COOKIE_DOMAIN`, …).
+- Until the JWT guard lands, `app/middleware/current_user_middleware.ts` sets `ctx.userId` from `DEV_USER_ID` (24 hex characters; boot refuses it in production). The guard replaces it with `ctx.auth.user.id`.
+- Env validated at boot in `start/env.ts` (`MONGO_URL`, `DEV_USER_ID` until the guard lands, `APP_KEY`, `JWT_SECRET`, `PHOTOS_BUCKET`, `AWS_REGION`, `COOKIE_DOMAIN`, …).
 - Tests: Japa. Unit for conversion and readings validation; functional (HTTP) against a Testcontainers Mongo, one container per test run, database dropped between suites. S3 calls stubbed in tests (presigner is pure — no network).
 - `web/`: Vite + React + TypeScript, `vite-plugin-pwa`, Tailwind v4 via `@tailwindcss/vite` (CSS-first config, no `tailwind.config.js`), shadcn/ui components as editable source under `web/src/components/ui/` (ADR-0005), `react-router` for the screens below, TanStack Query for server state, Recharts for trends, the shared conversion module and `PARAMETERS` imported (or copied until a shared package exists).
 

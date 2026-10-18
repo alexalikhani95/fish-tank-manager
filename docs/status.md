@@ -13,9 +13,9 @@
 
 ## Infrastructure
 
-| Resource    | State   | Notes                                       | Last verified |
-| ----------- | ------- | ------------------------------------------- | ------------- |
-| GitHub repo | created | `alexalikhani95/fish-tank-manager`, private | 2026-09-26    |
+| Resource    | State   | Notes                                      | Last verified |
+| ----------- | ------- | ------------------------------------------ | ------------- |
+| GitHub repo | created | `alexalikhani95/fish-tank-manager`, public | 2026-10-18    |
 
 ## Application
 
@@ -23,5 +23,5 @@
 | --------------- | --------------------------------------------------------------------------------------------------------- | ------------- |
 | Product plan    | written — PRD, PLAN, CONTEXT, hld, lld, ADR-0002 to ADR-0007                                              | 2026-10-18    |
 | App             | API scaffolded — AdonisJS 7 + Mongoose, Tanks CRUD, Zod validation, 13 tests green; `web/` not scaffolded | 2026-10-18    |
-| CI (PR checks)  | not created                                                                                               | 2026-09-21    |
-| Deploy pipeline | not created                                                                                               | 2026-09-21    |
+| CI (PR checks)  | not created                                                                                               | 2026-10-18    |
+| Deploy pipeline | not created                                                                                               | 2026-10-18    |

@@ -14,7 +14,8 @@ import { middleware } from '#start/kernel'
 
 router
   .group(() => {
-    // Lambda Web Adapter's readiness check: 503 until Mongo is connected (docs/design/lld.md).
+    // Lambda Web Adapter's readiness check (docs/design/lld.md). Boot waits for Mongo,
+    // so a 503 means the connection dropped after boot.
     router.get('health', ({ response }) => {
       const connected = mongoose.connection.readyState === 1
       return response.status(connected ? 200 : 503).send({
