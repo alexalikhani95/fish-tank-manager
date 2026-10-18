@@ -10,4 +10,8 @@ export const createTankSchema = z.object({
   volumeLitres: z.number().positive(),
 })
 
-export const updateTankSchema = createTankSchema.partial()
+// Strict, and at least one field: a misspelled key must be a 400, not a silent no-op 200.
+export const updateTankSchema = createTankSchema
+  .partial()
+  .strict()
+  .refine((fields) => Object.keys(fields).length > 0, 'Send at least one field to change')

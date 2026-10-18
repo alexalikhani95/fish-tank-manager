@@ -14,19 +14,25 @@ import { middleware } from '#start/kernel'
 
 router
   .group(() => {
-    router.get('health', () => ({
-      status: 'ok',
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    }))
+    // Lambda Web Adapter's readiness check: 503 until Mongo is connected (docs/design/lld.md).
+    router.get('health', ({ response }) => {
+      const connected = mongoose.connection.readyState === 1
+      return response.status(connected ? 200 : 503).send({
+        status: connected ? 'ok' : 'unavailable',
+        database: connected ? 'connected' : 'disconnected',
+      })
+    })
 
     router
       .group(() => {
         router.get('tanks', [controllers.Tanks, 'index'])
         router.post('tanks', [controllers.Tanks, 'store'])
-        router.get('tanks/:id', [controllers.Tanks, 'show'])
-        router.patch('tanks/:id', [controllers.Tanks, 'update'])
-        router.delete('tanks/:id', [controllers.Tanks, 'destroy'])
+        router.get('tanks/:tankId', [controllers.Tanks, 'show'])
+        router.patch('tanks/:tankId', [controllers.Tanks, 'update'])
+        router.delete('tanks/:tankId', [controllers.Tanks, 'destroy'])
       })
+      // Not an ObjectId → no route matches → 404, instead of a Mongoose CastError → 500.
+      .where('tankId', /^[0-9a-f]{24}$/i)
       .use(middleware.currentUser())
   })
   .prefix('/api/v1')

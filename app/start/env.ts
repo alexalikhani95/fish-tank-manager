@@ -26,6 +26,17 @@ export default await Env.create(new URL('../', import.meta.url), {
   MONGO_URL: Env.schema.string(),
 
   // ponytail: stands in for the authenticated User until the JWT guard
-  // lands (ADR-0003/0006), then it goes away.
-  DEV_USER_ID: Env.schema.string(),
+  // lands (ADR-0003/0006), then it goes away. Refused in production: with it,
+  // every caller would act as that one User.
+  DEV_USER_ID: (key: string, value?: string) => {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `${key} is a dev-only stub; the API cannot run in production until the JWT guard lands`
+      )
+    }
+    if (!value || !/^[0-9a-f]{24}$/i.test(value)) {
+      throw new Error(`${key} must be a 24-character hex ObjectId`)
+    }
+    return value
+  },
 })

@@ -11,9 +11,11 @@ import env from '#start/env'
  * `ctx.userId = ctx.auth.user!.id` and nothing else changes — every query below
  * already filters on ctx.userId, which is the part that must not be retrofitted.
  */
+const devUserId = new Types.ObjectId(env.get('DEV_USER_ID'))
+
 export default class CurrentUserMiddleware {
   async handle(ctx: HttpContext, next: NextFn) {
-    ctx.userId = new Types.ObjectId(env.get('DEV_USER_ID'))
+    ctx.userId = devUserId
     return next()
   }
 }

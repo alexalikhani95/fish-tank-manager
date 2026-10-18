@@ -30,6 +30,12 @@ test.group('Tanks', (group) => {
     response.assertStatus(400)
   })
 
+  test('accepts any volume above zero', async ({ client }) => {
+    const response = await client.post('/api/v1/tanks').json({ name: 'Jar', volumeLitres: 0.05 })
+
+    response.assertStatus(201)
+  })
+
   test('lists only the current user tanks, newest first', async ({ client, assert }) => {
     await Tank.create({ name: 'Older', volumeLitres: 60, userId })
     await Tank.create({ name: 'Newer', volumeLitres: 120, userId })
@@ -66,6 +72,23 @@ test.group('Tanks', (group) => {
     response.assertBodyContains({ name: 'New name', volumeLitres: 54 })
   })
 
+  test('rejects an update that sets the volume to zero', async ({ client }) => {
+    const tank = await Tank.create({ name: 'Nano', volumeLitres: 30, userId })
+
+    const response = await client.patch(`/api/v1/tanks/${tank.id}`).json({ volumeLitres: 0 })
+
+    response.assertStatus(400)
+  })
+
+  test('rejects an update with a misspelled or empty body', async ({ client }) => {
+    const tank = await Tank.create({ name: 'Nano', volumeLitres: 30, userId })
+
+    for (const body of [{ volume: 60 }, {}]) {
+      const response = await client.patch(`/api/v1/tanks/${tank.id}`).json(body)
+      response.assertStatus(400)
+    }
+  })
+
   test('deletes a tank', async ({ client, assert }) => {
     const tank = await Tank.create({ name: 'Going', volumeLitres: 10, userId })
 
@@ -90,6 +113,18 @@ test.group('Tanks', (group) => {
       await client.get(`/api/v1/tanks/${theirs.id}`),
       await client.patch(`/api/v1/tanks/${theirs.id}`).json({ name: 'Mine now' }),
       await client.delete(`/api/v1/tanks/${theirs.id}`),
+    ]) {
+      response.assertStatus(404)
+    }
+  })
+})
+
+test.group('Tanks — malformed id', () => {
+  test('an id that is not an ObjectId is a 404, not a 500', async ({ client }) => {
+    for (const response of [
+      await client.get('/api/v1/tanks/abc'),
+      await client.patch('/api/v1/tanks/abc').json({ name: 'x' }),
+      await client.delete('/api/v1/tanks/abc'),
     ]) {
       response.assertStatus(404)
     }

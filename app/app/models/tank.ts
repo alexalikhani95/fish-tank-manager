@@ -11,7 +11,8 @@ const tankSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, required: true, index: true },
     name: { type: String, required: true, trim: true },
-    volumeLitres: { type: Number, required: true, min: 0.1 },
+    // Same rule as the Zod schema and lld.md: any volume above zero.
+    volumeLitres: { type: Number, required: true, validate: (litres: number) => litres > 0 },
   },
   { timestamps: true }
 )

@@ -81,7 +81,7 @@ Base `/api/v1`. Authenticated by the JWT cookie — or a bearer header (ADR-0006
 | POST                 | `auth/register`, `auth/login`     | `{ email, password }` → User; JWT set as an httpOnly cookie (ADR-0006)                                         |
 | POST                 | `auth/logout`                     | clears the cookie                                                                                              |
 | GET / PATCH          | `me`                              | PATCH: `volumeUnit`, `temperatureUnit`                                                                         |
-| GET                  | `health`                          | `{ status, database }`                                                                                         |
+| GET                  | `health`                          | `{ status, database }`; 503 when Mongo is not connected (readiness check)                                      |
 | GET / POST           | `tanks`                           | GET returns dashboard summaries (see below)                                                                    |
 | GET / PATCH / DELETE | `tanks/:tankId`                   | DELETE cascades; PATCH replaces `fish` / `plants` wholesale                                                    |
 | POST                 | `tanks/:tankId/photo`             | `{ contentType, size }` → `{ uploadUrl, key }`; allowlist `image/jpeg` \| `image/png` \| `image/webp`, ≤ 10 MB |
@@ -127,11 +127,11 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 
 ## Framework wiring (planned)
 
-- AdonisJS **slim** starter — no Lucid, no `@adonisjs/session`. `@adonisjs/auth` kept for the guard contract only (ADR-0003).
+- AdonisJS 7 `api` starter with Lucid, session and shield removed — v7 has no slim kit (`PLAN.md` → Scaffold). `@adonisjs/auth` returns for the guard contract only (ADR-0003).
 - Mongoose registered as an Adonis provider (`providers/mongo_provider.ts`): one connection opened at boot from `MONGO_URL`, closed on shutdown; models under `app/models/` as Mongoose schemas.
 - JWT guard under `app/auth/guards/jwt.ts` implementing `GuardContract`: reads the `token` cookie, else the `Authorization: Bearer` header (ADR-0006), verifies HS256, then loads the User via `app/auth/user_provider.ts` and rejects if the JWT's `tokenVersion` no longer matches the User's. Registered in `config/auth.ts` as the default guard.
 - Validators under `app/validators/` as Zod schemas, one per request shape (ADR-0007); a `ZodError` becomes a 400 in `app/exceptions/handler.ts`; `readings` validator imports `PARAMETERS`.
-- Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group.
+- Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group — arrives with the first `tanks/:tankId/*` child route. Until then `TanksController` filters on `{ _id: tankId, userId }` itself. `:tankId` must be 24 hex characters (route matcher), so a malformed id is a 404, not a 500.
 - S3 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` in `app/services/photo_service.ts`. Bucket and region from env.
 - Runs on Lambda via Lambda Web Adapter (ADR-0004): the same Docker image as local, adapter copied into `/opt/extensions/`, readiness check on `/api/v1/health`. The Mongo connection opened at boot is reused across warm invocations.
 - Env validated at boot in `start/env.ts` (`MONGO_URL`, `APP_KEY`, `JWT_SECRET`, `PHOTOS_BUCKET`, `AWS_REGION`, `COOKIE_DOMAIN`, …).
