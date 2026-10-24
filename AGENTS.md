@@ -29,7 +29,7 @@ fish-tank-manager/
 ├── .codex/hooks.json       # Codex project hooks (same context-check)
 ├── qa/naive-user/          # Naive-user agent's findings + memory of the app               (planned)
 ├── .worktrees/             # One worktree per piece of work — gitignored; `git worktree list`
-├── tickets/<feature>/      # spec.md + issues/NN-*.md — the issue tracker                 (planned)
+├── tickets/<feature>/      # spec.md + issues/NN-*.md + log.md — the issue tracker        (planned)
 └── .githooks/              # Versioned git hooks (enable: git config core.hooksPath .githooks)
 ```
 
@@ -45,8 +45,8 @@ fish-tank-manager/
 | What is actually live / deployed / verified?  | `docs/status.md`                                      |
 | Why was X decided?                            | `docs/adr/`                                           |
 | How do I run / test it?                       | Commands, below                                       |
-| How do I take a feature from idea to PR?      | Dev flow, below → `docs/agents/workflow.md`           |
-| Which skill / toolkit for which step?         | `docs/agents/workflow.md` → Skills                    |
+| How do I take a feature from idea to PR?      | `/develop` → Dev flow, below                          |
+| Which skill / toolkit for which step?         | `docs/agents/workflow.md` → Skills and plugins        |
 | Where are the specs and tickets?              | `tickets/<feature>/` → `docs/agents/issue-tracker.md` |
 | How does it get deployed?                     | `PLAN.md` → Deploy pipeline                           |
 | How do we commit / branch / PR?               | `docs/conventions/git.md`                             |
@@ -68,7 +68,9 @@ Before claiming work is done: typecheck, lint, and tests all green.
 
 ## Dev flow
 
-`/grill-with-docs` → `/to-spec` → `/to-tickets` → `/implement` → `/code-review`. Keep the first three in one unbroken context window; `/implement` starts fresh per ticket. Details and which toolkit owns which step: `docs/agents/workflow.md` → Skills.
+Type `/develop <what to build>` (Codex: `$develop`). The skill runs `/grill-with-docs` → `/to-spec` → `/to-tickets` → `/implement` per ticket → `/code-review`, and stops for the user at the spec, the tickets and the merge. It owns the loop's rules; what it reads from this repo, and the by-hand version: `docs/agents/workflow.md`.
+
+- **Pick a lane first.** `/develop` has a fast and a full lane, announced before any work and vetoable by the user. Trivial changes skip `/develop`: `docs/agents/workflow.md`.
 
 - **Issue tracker**: local markdown under `tickets/<feature-slug>/` — see `docs/agents/issue-tracker.md`.
 
@@ -88,13 +90,13 @@ Before claiming work is done: typecheck, lint, and tests all green.
 - **Design docs are living**: a ticket that changes a table, route, flow, or component updates `lld.md`/`hld.md` in the same PR. A ticket that changes what v1 _is_ updates `PRD.md`.
 - **Decisions**: anything that reverses or constrains an earlier choice gets an ADR in `docs/adr/NNNN-<slug>.md`.
 - **Git**: Conventional Commits, `feature/<slug>` branches, PR + squash merge even solo — see `docs/conventions/git.md`. Agent commit rules: Commit discipline, below.
-- **Decisions are the user's**: when presenting options or a recommendation, lead with the question, give the recommendation, then list **Needs your decision** and **Decided without asking** (with the reason — only things an ADR, the repo, or a measurement already settles). Then stop. No file edits until the user answers. If there is nothing to decide, just answer. The three `/develop` gates and its close-out use the fuller form in `docs/agents/workflow.md` → Gate messages.
+- **Decisions are the user's**: when presenting options or a recommendation, lead with the question, give the recommendation, then list **Needs your decision** and **Decided without asking** (with the reason — only things an ADR, the repo, or a measurement already settles). Then stop. No file edits until the user answers. If there is nothing to decide, just answer. `/develop`'s stops and its wrap-up use the fuller form in the skill.
 - **One home per fact**: each fact lives in exactly one doc; every other doc links to it rather than restating it. Why/what → `PRD.md`. How → `docs/design/`. Phases/when → `PLAN.md`. Domain terms → `CONTEXT.md`. Decisions → `docs/adr/`. How agents work → this file + `docs/agents/`. How we use git → `docs/conventions/git.md`. If you find the same rule written twice, delete one and link.
 
 ## Commit discipline
 
-- **Commit only when explicitly asked.** Never commit unprompted. Edit, report what changed, stop.
+- **Commit only when explicitly asked.** Never commit unprompted. Edit, report what changed, stop. Starting `/develop` counts as asking, for its own feature branch.
 - **Never commit on `main`** — every piece of work runs in its own worktree under `.worktrees/`; see `docs/agents/workflow.md` → Worktree per thing. (Exception: the initial planning/scaffold commits, per `docs/conventions/git.md`.)
 - **Keep deploy/infra work in its own commit** — `Dockerfile`, `infra/`, `.github/`, env wiring. Do not fold it into feature commits.
 - **Stage deliberately.** If the working tree has unrelated in-progress edits (the user's own), don't sweep them into your commit — stage only the files you changed. Never `git add -A` or `commit -a`.
-- **Never push, force-push, rebase, or reset** unless asked in the current message.
+- **Never push, force-push, rebase, or reset** unless asked in the current message. `/develop` pushes its own feature branch; it never force-pushes, rebases or resets.
