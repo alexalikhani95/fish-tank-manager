@@ -25,7 +25,8 @@ fish-tank-manager/
 │   ├── agents/             # How agents work here — workflow, issue tracker
 │   └── conventions/        # How we build — git, …
 ├── scripts/                # Repo tooling — context-check hook, status-claims gate (+ tests)
-├── .claude/settings.json   # Project hooks (context-check on every prompt)
+├── .claude/settings.json   # Claude project hooks (context-check on every prompt)
+├── .codex/hooks.json       # Codex project hooks (same context-check)
 ├── qa/naive-user/          # Naive-user agent's findings + memory of the app               (planned)
 ├── .worktrees/             # One worktree per piece of work — gitignored; `git worktree list`
 ├── tickets/<feature>/      # spec.md + issues/NN-*.md — the issue tracker                 (planned)
@@ -76,7 +77,7 @@ Before claiming work is done: typecheck, lint, and tests all green.
 - **The session orchestrates; subagents implement.** During `/implement`, the session does not edit source files itself. It dispatches **one implementer subagent per ticket** with the ticket file + `spec.md`, waits for the report, then runs `/code-review` on the diff. Planning, grilling, spec, and tickets stay in the session — they are conversation, not code.
 - **Ticket = unit of dispatch.** Never bundle tickets into one subagent; never split one ticket across several. If a ticket is too big for one dispatch, that's a `/to-tickets` bug — go back and slice it.
 - **Subagent reports are quoted, not re-authored.** Relay status, what changed, what was skipped, and test results as the subagent wrote them. Don't summarise a failure into a success.
-- **Context-size safety net.** `scripts/context-check.mjs` runs on every prompt (`.claude/settings.json`) and, past **200,000 tokens** of live context, prints a line telling the session to hand off. When it fires: finish the current ticket or reach a clean stopping point, write what is done and what is next into the ticket's `## Comments`, and start a fresh session. Raising the threshold is a decision to record, not a tuning knob. Tests: `node --test 'scripts/**/*.test.mjs'`.
+- **Context-size safety net.** `scripts/context-check.mjs` runs on every prompt in Claude (`.claude/settings.json`) and Codex (`.codex/hooks.json`), reading either agent's transcript, and, past **200,000 tokens** of live context, prints a line telling the session to hand off. When it fires: finish the current ticket or reach a clean stopping point, write what is done and what is next into the ticket's `## Comments`, and start a fresh session. Raising the threshold is a decision to record, not a tuning knob. Tests: `node --test 'scripts/**/*.test.mjs'`.
 - **Status has one home.** Environment and infra state — what exists, where, verified when — goes only in `docs/status.md`; `scripts/check-status-claims.sh` fails CI on a claim elsewhere. When a ticket changes what is real, update `docs/status.md` in the same PR.
 
 ## Conventions

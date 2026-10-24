@@ -190,6 +190,57 @@ test("the emitted line satisfies its required properties", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Codex transcripts — a different shape, same question
+// ---------------------------------------------------------------------------
+
+// The real Codex shape: usage arrives as an `event_msg` whose payload is a `token_count`.
+// `info` is null on the first one, before any model call has reported.
+const codexCount = (input_tokens) =>
+  JSON.stringify({
+    type: "event_msg",
+    payload: {
+      type: "token_count",
+      info:
+        input_tokens === null
+          ? null
+          : {
+              total_token_usage: { input_tokens: 999999 },
+              last_token_usage: {
+                input_tokens,
+                cached_input_tokens: 12160,
+                output_tokens: 69,
+              },
+            },
+    },
+  });
+const codexOther = (type) =>
+  JSON.stringify({ type: "response_item", payload: { type } });
+
+test("Codex: reads last_token_usage.input_tokens of the last token_count", () => {
+  // input_tokens already includes the cached ones, so it is the live number on its own.
+  // total_token_usage is a running sum across turns, so reading it would over-count.
+  const p = fixture(
+    jsonl(codexCount(1000), codexCount(250000), codexOther("message")),
+  );
+  assert.equal(liveContext(p), 250000);
+});
+
+test("Codex: skips token_count events with no info yet", () => {
+  assert.equal(
+    liveContext(fixture(jsonl(codexCount(250000), codexCount(null)))),
+    250000,
+  );
+  assert.equal(liveContext(fixture(jsonl(codexCount(null)))), null);
+});
+
+test("spawned: a Codex transcript over threshold prints the line and exits 0", () => {
+  const r = run(payload(fixture(jsonl(codexCount(250000)))));
+  assert.equal(r.status, 0);
+  assert.equal(r.stderr, "");
+  assert.match(r.stdout, /^Context check: 250,000 /);
+});
+
+// ---------------------------------------------------------------------------
 // SPAWNED — the exit code, which is the whole safety property
 //
 // spawnSync rather than execFileSync: execFileSync THROWS on a non-zero exit and hands
