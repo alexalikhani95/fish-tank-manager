@@ -34,6 +34,10 @@ export const HANDOFF_THRESHOLD = 200000;
  * Subagent turns live in separate transcript files, so `isSidechain` is false throughout
  * a real main transcript; it is still checked, because a sidechain line would report the
  * subagent's context as the session's.
+ *
+ * Codex writes a different transcript: usage arrives as an `event_msg` whose payload is a
+ * `token_count`. There the live number is `last_token_usage.input_tokens` alone, since it
+ * already includes the cached tokens; `total_token_usage` is a running sum across turns.
  */
 export function liveContext(transcriptPath) {
   let lines;
@@ -48,6 +52,10 @@ export function liveContext(transcriptPath) {
       entry = JSON.parse(lines[i]);
     } catch {
       continue; // a blank tail, or the half-written line of a live append
+    }
+    const codex = entry?.payload?.type === "token_count" && entry.payload.info;
+    if (entry?.type === "event_msg" && codex) {
+      return codex.last_token_usage?.input_tokens ?? 0;
     }
     if (entry?.type !== "assistant" || entry.isSidechain === true) continue;
     const usage = entry.message?.usage ?? {};

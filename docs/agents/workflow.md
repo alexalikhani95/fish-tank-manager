@@ -138,25 +138,31 @@ A skill is instructions, not law; `AGENTS.md` wins. Two known conflicts, both in
   Write the tests the ticket needs, in whatever order suits the work; step 5 still
   requires them green with the output shown.
 
-Installation: `npx skills add mattpocock/skills` after scaffold (lockfile
-`skills-lock.json`) — install the whole set, not a subset, or a step in the chain will be
-missing when you reach it. `ponytail` is a user-level plugin; `naive-user` is installed
-once there is a UI.
+Installation: the skills in the table come from the personal skills repo
+([alexalikhani95/skills](https://github.com/alexalikhani95/skills)), cloned to
+`~/.claude/skills`. Claude reads it there; its `sync.sh` links each skill into
+`~/.codex/skills` so Codex reads the same copy. Nothing is installed per project.
+`ponytail` is a user-level plugin; `naive-user` is installed once there is a UI.
 
-**Repo-local skills to add once code exists** (`.claude/skills/`, modelled on techgarden):
+**Repo-local skills to add once code exists**, modelled on techgarden. Each lives in
+`.agents/skills/<name>/` (where Codex looks), with a symlink to it from
+`.claude/skills/<name>` (where Claude looks), so both agents read one copy:
 
 - `running-the-app` — how to start the app locally, seed data, reset; used by `/run`
   and the naive-user agent.
 - `reconciling-status` — the checklist the self-check runs: which of `hld.md`, `lld.md`,
   `PRD.md`, `docs/status.md`, `CONTEXT.md` a change touches, and what "reconciled" means.
 
-## Planned: `/develop` — one command that runs the loop
+## Planned: `/develop` — one skill that runs the loop
 
 Modelled on techgarden's `.claude/commands/develop.md`, at roughly a quarter of the
-size. **Written after the first feature ships through the manual flow above**, so it
+size. It is written as a repo-local skill (`.agents/skills/develop/`, symlinked from
+`.claude/skills/develop`, as above), not a Claude command, because Codex does not read
+`.claude/commands/`. Its frontmatter sets `disable-model-invocation: true` so it only
+runs when typed. **Written after the first feature ships through the manual flow above**, so it
 encodes what actually happened rather than what we imagined (see `PLAN.md` Phase 1).
 Until then, the five skills are run by hand in the order shown. Lane selection
-(above) applies whether the loop is run by hand or by the command.
+(above) applies whether the loop is run by hand or by the skill.
 
 ### Shape
 
