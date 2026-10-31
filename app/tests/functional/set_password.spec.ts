@@ -9,11 +9,20 @@ import { createLoggedInUser, password, tokenCookie, unauthorized } from '../help
 
 const email = 'keeper@example.com'
 
-/** The command, created in-process with its output captured (raw mode). */
+/**
+ * The command, created in-process with its output captured (raw mode). A prompt
+ * with no trap throws at once instead of waiting on stdin (which hangs a TTY run).
+ */
 async function createCommand(argument: string) {
   const ace = await app.container.make('ace')
   ace.ui.switchMode('raw')
-  return ace.create(SetPassword, [argument])
+  const command = await ace.create(SetPassword, [argument])
+  Object.assign(command.prompt, {
+    prompt(options: { message: string }) {
+      throw new Error(`untrapped prompt: ${options.message}`)
+    },
+  })
+  return command
 }
 
 /** Answers both hidden prompts, runs the command, and checks both prompts were asked. */
@@ -101,24 +110,13 @@ test.group('user:set-password', (group) => {
     trimmed.assertStatus(401)
   })
 
-  test('refuses an unknown email before any prompt', async ({ client, assert }) => {
+  test('refuses an unknown email before any prompt', async ({ client }) => {
+    // No traps: any prompt throws "untrapped prompt" and fails the test.
     const command = await createCommand('nobody@example.com')
-    // Trapped so a prompt can't hang the test; both traps must still be unused afterwards.
-    command.prompt.trap('New password').replyWith('a brand new passphrase')
-    command.prompt.trap('Confirm password').replyWith('a brand new passphrase')
 
-    try {
-      await command.exec()
-      command.assertFailed()
-      assert.sameMembers(
-        [...command.prompt.traps.prompts.keys()],
-        ['New password', 'Confirm password']
-      )
-    } finally {
-      // The prompt is shared by every command: don't leak unused traps into the next test.
-      command.prompt.traps.prompts.clear()
-    }
+    await command.exec()
 
+    command.assertFailed()
     await assertUnchanged(client, cookie)
   })
 
@@ -134,6 +132,15 @@ test.group('user:set-password', (group) => {
     const elevenCharacters = 'abcdefghijk'
 
     const command = await runWith(email, elevenCharacters, elevenCharacters)
+
+    command.assertFailed()
+    await assertUnchanged(client, cookie)
+  })
+
+  test('refuses a password longer than 256 characters', async ({ client }) => {
+    const tooLong = 'x'.repeat(257)
+
+    const command = await runWith(email, tooLong, tooLong)
 
     command.assertFailed()
     await assertUnchanged(client, cookie)

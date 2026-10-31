@@ -43,10 +43,16 @@ export default class SetPassword extends BaseCommand {
     }
 
     // Bumping tokenVersion makes every token signed before now a 401.
-    await User.updateOne(
+    const result = await User.updateOne(
       { _id: user._id },
       { $set: { passwordHash: await hash.make(password) }, $inc: { tokenVersion: 1 } }
     )
+    // Only if the User was deleted since the lookup: don't claim a change that didn't happen.
+    if (result.matchedCount !== 1) {
+      this.logger.error(`No User with email "${this.email}". Nothing changed.`)
+      this.exitCode = 1
+      return
+    }
     this.logger.success(`Password set for ${user.email}. Every device is signed out.`)
   }
 }
