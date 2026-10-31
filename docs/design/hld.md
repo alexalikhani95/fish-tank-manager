@@ -10,7 +10,7 @@ _Living document._ Components, boundaries, core flows, cross-cutting rules. Reco
 │ React + Vite │ ───────────▶ │ CloudFront + S3 (static PWA bundle)        │
 │ vite-plugin- │              │                                            │
 │ pwa (SW,     │    /api/v1   │ CloudFront /api/* → Lambda (ADR-0004)      │
-│ manifest)    │ ───────────▶ │  └─ api — AdonisJS (JWT guard, REST)       │
+│ manifest)    │ ───────────▶ │  └─ api — AdonisJS (JWT middleware, REST)       │
 │              │              │                                            │
 │              │  presigned   │ S3 photos bucket (private)                 │
 │              │ ───────────▶ │                                            │
@@ -18,12 +18,12 @@ _Living document._ Components, boundaries, core flows, cross-cutting rules. Reco
                                  MongoDB Atlas M0 (system of record)
 ```
 
-| Component           | Role                                                                                                   | Talks to            |
-| ------------------- | ------------------------------------------------------------------------------------------------------ | ------------------- |
-| **PWA** (`web/`)    | Mobile-first React app; installable via Add to Home Screen. Holds the JWT. Converts units at the edge. | API, S3 (presigned) |
-| **API** (`app/`)    | AdonisJS without Lucid (ADR-0003). Auth, ownership checks, all CRUD, presigned URL issuing.            | MongoDB, S3 (sign)  |
-| **MongoDB** (Atlas) | The only database (ADR-0002) — users, tanks, water changes, water tests.                               | —                   |
-| **S3 photos**       | One object per tank. Private; every read is a short-lived presigned GET.                               | —                   |
+| Component           | Role                                                                                                                                | Talks to            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| **PWA** (`web/`)    | Mobile-first React app; installable via Add to Home Screen. The browser holds the httpOnly auth cookie. Converts units at the edge. | API, S3 (presigned) |
+| **API** (`app/`)    | AdonisJS without Lucid (ADR-0003). Auth, ownership checks, all CRUD, presigned URL issuing.                                         | MongoDB, S3 (sign)  |
+| **MongoDB** (Atlas) | The only database (ADR-0002) — users, tanks, water changes, water tests.                                                            | —                   |
+| **S3 photos**       | One object per tank. Private; every read is a short-lived presigned GET.                                                            | —                   |
 
 No worker, queue, cache, or email service in v1. Stack choices and reasons: `PLAN.md` → Tech Stack; reversals get an ADR.
 
@@ -68,11 +68,11 @@ One service call: delete the Tank, its WaterChanges, its WaterTests, and its S3 
 
 ## Cross-cutting
 
-**Ownership.** Single-user: there is no tenant above the User. Every tank-owned document carries `userId` alongside `tankId`. A tank-scoped route loads the Tank by `(tankId, userId)` first; **a Tank that isn't the caller's returns 404, never 403** — the caller must not learn it exists. 403 is unused in v1 (no roles). If sharing ever arrives, the tenant slots in between User and Tank (`PLAN.md` → Stretch).
+**Ownership.** Single-user: there is no tenant above the User. Every tank-owned document carries `userId` alongside `tankId`. A tank-scoped route loads the Tank by `(tankId, userId)` first; **a Tank that isn't the caller's returns 404, never 403** — the caller must not learn it exists. 403 is used only for closed sign-up (no roles). If sharing ever arrives, the tenant slots in between User and Tank (`PLAN.md` → Stretch).
 
-**Auth.** Custom JWT guard registered with `@adonisjs/auth` (ADR-0003). HS256, 30-day expiry, secret from env. The token is delivered as an `httpOnly; Secure; SameSite=Lax` cookie and the guard falls back to an `Authorization: Bearer` header for future native clients (ADR-0006). No sessions, refresh tokens, or token table — the API stays stateless. `POST auth/logout` clears the cookie; a `tokenVersion` claim checked against `User.tokenVersion` revokes every token a User holds. CSRF: `SameSite=Lax` plus a JSON-only API, no CSRF token in v1.
+**Auth.** One route middleware, no `@adonisjs/auth` guard (ADR-0009). HS256, 30-day expiry, secret from env. The token is delivered as an `httpOnly; Secure; SameSite=Lax` cookie and the middleware falls back to an `Authorization: Bearer` header for future native clients (ADR-0006). No sessions, refresh tokens, or token table — the API stays stateless. `POST auth/logout` clears the cookie; a `tokenVersion` claim checked against `User.tokenVersion` revokes every token a User holds. CSRF: `SameSite=Lax` plus a JSON-only API, no CSRF token in v1.
 
-**Validation.** Zod at every request boundary (ADR-0007). Registration closes behind `REGISTRATION_OPEN` once the keeper's account exists (`lld.md` → Auth hardening). `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
+**Validation.** Zod at every request boundary (ADR-0007). Sign-up closes by itself once a User exists (`lld.md` → Auth hardening). `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
 
 **Derived, never stored.** Last water change, last test, litres replaced by a water change, trends, gallons, °F. Anything computable from the log is computed.
 
