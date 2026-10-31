@@ -45,6 +45,6 @@ router
       })
       // Not an ObjectId → no route matches → 404, instead of a Mongoose CastError → 500.
       .where('tankId', /^[0-9a-f]{24}$/i)
-      .use(middleware.currentUser())
+      .use(middleware.auth())
   })
   .prefix('/api/v1')

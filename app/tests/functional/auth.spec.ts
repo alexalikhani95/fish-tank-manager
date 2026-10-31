@@ -4,38 +4,11 @@ import type { Assert } from '@japa/assert'
 import hash from '@adonisjs/core/services/hash'
 import { SignJWT } from 'jose'
 import { User } from '#models/user'
-import env from '#start/env'
+import { jwtOf, signWithTestSecret, tokenCookie, tokenSetCookie } from '../helpers/auth.js'
 
 const credentials = { email: 'keeper@example.com', password: 'a long passphrase' }
 
 const unauthorized = { errors: [{ field: '', message: 'Unauthorized' }] }
-
-/** The `token` Set-Cookie line, if the response set one. */
-function tokenSetCookie(response: ApiResponse): string | undefined {
-  const setCookie: string[] = [response.headers()['set-cookie'] ?? []].flat()
-  return setCookie.find((line) => line.startsWith('token='))
-}
-
-/**
- * `token=<jwt>`, ready to send back as a raw `cookie` header. Japa's cookie
- * helpers sign or encode values, which a bare JWT must not be.
- */
-function tokenCookie(response: ApiResponse): string {
-  const line = tokenSetCookie(response)
-  if (!line) throw new Error('response set no token cookie')
-  return line.split(';')[0]
-}
-
-function jwtOf(response: ApiResponse): string {
-  return tokenCookie(response).slice('token='.length)
-}
-
-/** The only tokens tests build themselves: signed with the test JWT_SECRET. */
-function signWithTestSecret(jwt: SignJWT): Promise<string> {
-  return jwt
-    .setProtectedHeader({ alg: 'HS256' })
-    .sign(new TextEncoder().encode(env.get('JWT_SECRET')))
-}
 
 test.group('Register', (group) => {
   group.each.setup(async () => {

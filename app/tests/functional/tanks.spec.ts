@@ -1,25 +1,53 @@
 import { test } from '@japa/runner'
 import { Types } from 'mongoose'
+import type { ApiClient } from '@japa/api-client'
+import hash from '@adonisjs/core/services/hash'
 import { Tank } from '#models/tank'
-import env from '#start/env'
+import { User } from '#models/user'
+import { jwtOf, tokenCookie } from '../helpers/auth.js'
 
-const userId = env.get('DEV_USER_ID')
+const password = 'a long passphrase'
+
+/** A real User made through the model (sign-up closes after the first), logged in over HTTP. */
+async function createLoggedInUser(client: ApiClient, email: string) {
+  const user = await User.create({ email, passwordHash: await hash.make(password) })
+  const login = await client.post('/api/v1/auth/login').json({ email, password })
+  return { user, login }
+}
 
 test.group('Tanks', (group) => {
+  let userId: Types.ObjectId
+  let cookie: string
+  let jwt: string
+
   group.each.setup(async () => {
+    await User.deleteMany({})
     await Tank.deleteMany({})
   })
 
+  group.each.setup(async (t) => {
+    const keeper = await createLoggedInUser(t.context.client, 'keeper@example.com')
+    userId = keeper.user._id
+    cookie = tokenCookie(keeper.login)
+    jwt = jwtOf(keeper.login)
+  })
+
   test('creates a tank for the current user', async ({ client, assert }) => {
-    const response = await client.post('/api/v1/tanks').json({ name: 'Nano', volumeLitres: 30 })
+    const response = await client
+      .post('/api/v1/tanks')
+      .header('cookie', cookie)
+      .json({ name: 'Nano', volumeLitres: 30 })
 
     response.assertStatus(201)
     response.assertBodyContains({ name: 'Nano', volumeLitres: 30 })
-    assert.equal(response.body().userId, userId)
+    assert.equal(response.body().userId, userId.toString())
   })
 
   test('rejects a tank with no name, naming the field', async ({ client, assert }) => {
-    const response = await client.post('/api/v1/tanks').json({ volumeLitres: 30 })
+    const response = await client
+      .post('/api/v1/tanks')
+      .header('cookie', cookie)
+      .json({ volumeLitres: 30 })
 
     response.assertStatus(400)
     assert.deepEqual(
@@ -29,13 +57,19 @@ test.group('Tanks', (group) => {
   })
 
   test('rejects a volume of zero', async ({ client }) => {
-    const response = await client.post('/api/v1/tanks').json({ name: 'Nano', volumeLitres: 0 })
+    const response = await client
+      .post('/api/v1/tanks')
+      .header('cookie', cookie)
+      .json({ name: 'Nano', volumeLitres: 0 })
 
     response.assertStatus(400)
   })
 
   test('accepts any volume above zero', async ({ client }) => {
-    const response = await client.post('/api/v1/tanks').json({ name: 'Jar', volumeLitres: 0.05 })
+    const response = await client
+      .post('/api/v1/tanks')
+      .header('cookie', cookie)
+      .json({ name: 'Jar', volumeLitres: 0.05 })
 
     response.assertStatus(201)
   })
@@ -49,7 +83,7 @@ test.group('Tanks', (group) => {
       userId: new Types.ObjectId(),
     })
 
-    const response = await client.get('/api/v1/tanks')
+    const response = await client.get('/api/v1/tanks').header('cookie', cookie)
 
     response.assertStatus(200)
     assert.deepEqual(
@@ -61,7 +95,7 @@ test.group('Tanks', (group) => {
   test('reads one tank', async ({ client }) => {
     const tank = await Tank.create({ name: 'Shrimp bowl', volumeLitres: 20, userId })
 
-    const response = await client.get(`/api/v1/tanks/${tank.id}`)
+    const response = await client.get(`/api/v1/tanks/${tank.id}`).header('cookie', cookie)
 
     response.assertStatus(200)
     response.assertBodyContains({ name: 'Shrimp bowl' })
@@ -70,7 +104,10 @@ test.group('Tanks', (group) => {
   test('updates a tank', async ({ client }) => {
     const tank = await Tank.create({ name: 'Old name', volumeLitres: 54, userId })
 
-    const response = await client.patch(`/api/v1/tanks/${tank.id}`).json({ name: 'New name' })
+    const response = await client
+      .patch(`/api/v1/tanks/${tank.id}`)
+      .header('cookie', cookie)
+      .json({ name: 'New name' })
 
     response.assertStatus(200)
     response.assertBodyContains({ name: 'New name', volumeLitres: 54 })
@@ -79,7 +116,10 @@ test.group('Tanks', (group) => {
   test('rejects an update that sets the volume to zero', async ({ client }) => {
     const tank = await Tank.create({ name: 'Nano', volumeLitres: 30, userId })
 
-    const response = await client.patch(`/api/v1/tanks/${tank.id}`).json({ volumeLitres: 0 })
+    const response = await client
+      .patch(`/api/v1/tanks/${tank.id}`)
+      .header('cookie', cookie)
+      .json({ volumeLitres: 0 })
 
     response.assertStatus(400)
   })
@@ -88,18 +128,24 @@ test.group('Tanks', (group) => {
     const tank = await Tank.create({ name: 'Nano', volumeLitres: 30, userId })
 
     for (const body of [{ volume: 60 }, {}]) {
-      const response = await client.patch(`/api/v1/tanks/${tank.id}`).json(body)
+      const response = await client
+        .patch(`/api/v1/tanks/${tank.id}`)
+        .header('cookie', cookie)
+        .json(body)
       response.assertStatus(400)
     }
 
-    const misspelled = await client.patch(`/api/v1/tanks/${tank.id}`).json({ volume: 60 })
+    const misspelled = await client
+      .patch(`/api/v1/tanks/${tank.id}`)
+      .header('cookie', cookie)
+      .json({ volume: 60 })
     assert.deepInclude(misspelled.body().errors, { field: 'volume', message: 'Unknown field' })
   })
 
   test('deletes a tank', async ({ client, assert }) => {
     const tank = await Tank.create({ name: 'Going', volumeLitres: 10, userId })
 
-    const response = await client.delete(`/api/v1/tanks/${tank.id}`)
+    const response = await client.delete(`/api/v1/tanks/${tank.id}`).header('cookie', cookie)
 
     response.assertStatus(204)
     assert.isNull(await Tank.findById(tank.id))
@@ -110,26 +156,51 @@ test.group('Tanks', (group) => {
    * does not exist, on every route (docs/design/hld.md → Ownership).
    */
   test("another user's tank is a 404, not a 403", async ({ client }) => {
+    const other = await createLoggedInUser(client, 'other@example.com')
     const theirs = await Tank.create({
       name: 'Not yours',
       volumeLitres: 100,
-      userId: new Types.ObjectId(),
+      userId: other.user._id,
     })
 
     for (const response of [
-      await client.get(`/api/v1/tanks/${theirs.id}`),
-      await client.patch(`/api/v1/tanks/${theirs.id}`).json({ name: 'Mine now' }),
-      await client.delete(`/api/v1/tanks/${theirs.id}`),
+      await client.get(`/api/v1/tanks/${theirs.id}`).header('cookie', cookie),
+      await client
+        .patch(`/api/v1/tanks/${theirs.id}`)
+        .header('cookie', cookie)
+        .json({ name: 'Mine now' }),
+      await client.delete(`/api/v1/tanks/${theirs.id}`).header('cookie', cookie),
     ]) {
       response.assertStatus(404)
     }
   })
 
+  test('every tank route without a token is the exact 401', async ({ client }) => {
+    const id = '0123456789abcdef01234567'
+
+    for (const response of [
+      await client.get('/api/v1/tanks'),
+      await client.post('/api/v1/tanks').json({ name: 'Nano', volumeLitres: 30 }),
+      await client.get(`/api/v1/tanks/${id}`),
+      await client.patch(`/api/v1/tanks/${id}`).json({ name: 'x' }),
+      await client.delete(`/api/v1/tanks/${id}`),
+    ]) {
+      response.assertStatus(401)
+      response.assertBody({ errors: [{ field: '', message: 'Unauthorized' }] })
+    }
+  })
+
+  test('accepts an Authorization: Bearer header with no cookie', async ({ client }) => {
+    const response = await client.get('/api/v1/tanks').bearerToken(jwt)
+
+    response.assertStatus(200)
+  })
+
   test('an id that is not an ObjectId is a 404, not a 500', async ({ client }) => {
     for (const response of [
-      await client.get('/api/v1/tanks/abc'),
-      await client.patch('/api/v1/tanks/abc').json({ name: 'x' }),
-      await client.delete('/api/v1/tanks/abc'),
+      await client.get('/api/v1/tanks/abc').header('cookie', cookie),
+      await client.patch('/api/v1/tanks/abc').header('cookie', cookie).json({ name: 'x' }),
+      await client.delete('/api/v1/tanks/abc').header('cookie', cookie),
     ]) {
       response.assertStatus(404)
     }
