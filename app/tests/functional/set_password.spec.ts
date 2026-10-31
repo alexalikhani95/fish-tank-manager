@@ -12,10 +12,13 @@ const email = 'keeper@example.com'
 /**
  * The command, created in-process with its output captured (raw mode). A prompt
  * with no trap throws at once instead of waiting on stdin (which hangs a TTY run).
+ * `exec()` catches that throw into `command.error`, so tests must check it.
  */
 async function createCommand(argument: string) {
   const ace = await app.container.make('ace')
   ace.ui.switchMode('raw')
+  // The UI is shared by every command: start each one with no logs.
+  ace.ui.logger.flushLogs()
   const command = await ace.create(SetPassword, [argument])
   Object.assign(command.prompt, {
     prompt(options: { message: string }) {
@@ -31,6 +34,8 @@ async function runWith(argument: string, newPassword: string, confirmation: stri
   command.prompt.trap('New password').replyWith(newPassword)
   command.prompt.trap('Confirm password').replyWith(confirmation)
   await command.exec()
+  // A refusal sets the exit code without throwing; a throw is a bug, not a refusal.
+  if (command.error) throw command.error
   command.prompt.traps.verify()
   return command
 }
@@ -110,13 +115,17 @@ test.group('user:set-password', (group) => {
     trimmed.assertStatus(401)
   })
 
-  test('refuses an unknown email before any prompt', async ({ client }) => {
-    // No traps: any prompt throws "untrapped prompt" and fails the test.
+  test('refuses an unknown email before any prompt', async ({ client, assert }) => {
+    // No traps: a prompt would throw "untrapped prompt" into command.error.
     const command = await createCommand('nobody@example.com')
 
     await command.exec()
 
     command.assertFailed()
+    assert.isUndefined(command.error)
+    assert.isTrue(
+      command.ui.logger.getLogs().some((log) => log.message.includes('No User with email'))
+    )
     await assertUnchanged(client, cookie)
   })
 
