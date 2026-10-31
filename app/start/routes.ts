@@ -28,7 +28,12 @@ router
     router.post('auth/login', [controllers.Auth, 'login'])
     router.post('auth/logout', [controllers.Auth, 'logout'])
 
-    router.get('me', [controllers.Me, 'show']).use(middleware.auth())
+    router
+      .group(() => {
+        router.get('me', [controllers.Me, 'show'])
+        router.patch('me', [controllers.Me, 'update'])
+      })
+      .use(middleware.auth())
 
     router
       .group(() => {

@@ -8,6 +8,7 @@ export type ScannedRoutes = {
     'auth.login': { paramsTuple?: []; params?: {} }
     'auth.logout': { paramsTuple?: []; params?: {} }
     'me.show': { paramsTuple?: []; params?: {} }
+    'me.update': { paramsTuple?: []; params?: {} }
     'tanks.index': { paramsTuple?: []; params?: {} }
     'tanks.store': { paramsTuple?: []; params?: {} }
     'tanks.show': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
@@ -31,6 +32,7 @@ export type ScannedRoutes = {
     'tanks.store': { paramsTuple?: []; params?: {} }
   }
   PATCH: {
+    'me.update': { paramsTuple?: []; params?: {} }
     'tanks.update': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
   }
   DELETE: {

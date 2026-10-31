@@ -452,3 +452,99 @@ test.group('Logout', (group) => {
     same.assertStatus(200)
   })
 })
+
+test.group('Display units (PATCH me)', (group) => {
+  group.each.setup(async () => {
+    await User.deleteMany({})
+  })
+
+  test('sets both units, returns the User, and GET me shows them', async ({ client, assert }) => {
+    const registered = await client.post('/api/v1/auth/register').json(credentials)
+    const cookie = tokenCookie(registered)
+
+    const response = await client
+      .patch('/api/v1/me')
+      .header('cookie', cookie)
+      .json({ volumeUnit: 'usGal', temperatureUnit: 'F' })
+
+    response.assertStatus(200)
+    response.assertBodyContains({
+      _id: registered.body()._id,
+      volumeUnit: 'usGal',
+      temperatureUnit: 'F',
+    })
+    assert.notProperty(response.body(), 'passwordHash')
+    assert.notProperty(response.body(), 'tokenVersion')
+
+    const me = await client.get('/api/v1/me').header('cookie', cookie)
+    me.assertBodyContains({ volumeUnit: 'usGal', temperatureUnit: 'F' })
+  })
+
+  test('one unit alone leaves the other as it was', async ({ client }) => {
+    const registered = await client.post('/api/v1/auth/register').json(credentials)
+
+    const response = await client
+      .patch('/api/v1/me')
+      .header('cookie', tokenCookie(registered))
+      .json({ volumeUnit: 'ukGal' })
+
+    response.assertStatus(200)
+    response.assertBodyContains({ volumeUnit: 'ukGal', temperatureUnit: 'C' })
+  })
+
+  test('an invalid value is a 400 naming the field', async ({ client, assert }) => {
+    const registered = await client.post('/api/v1/auth/register').json(credentials)
+    const cookie = tokenCookie(registered)
+
+    const volume = await client
+      .patch('/api/v1/me')
+      .header('cookie', cookie)
+      .json({ volumeUnit: 'pints' })
+    volume.assertStatus(400)
+    assert.equal(volume.body().errors[0].field, 'volumeUnit')
+
+    const temperature = await client
+      .patch('/api/v1/me')
+      .header('cookie', cookie)
+      .json({ temperatureUnit: 'K' })
+    temperature.assertStatus(400)
+    assert.equal(temperature.body().errors[0].field, 'temperatureUnit')
+  })
+
+  test('an unknown key is a 400 naming it and changes nothing', async ({ client, assert }) => {
+    const registered = await client.post('/api/v1/auth/register').json(credentials)
+    const cookie = tokenCookie(registered)
+
+    for (const key of ['email', 'tokenVersion']) {
+      const response = await client
+        .patch('/api/v1/me')
+        .header('cookie', cookie)
+        .json({ volumeUnit: 'usGal', [key]: 'x' })
+
+      response.assertStatus(400)
+      assert.equal(response.body().errors[0].field, key)
+    }
+
+    const me = await client.get('/api/v1/me').header('cookie', cookie)
+    me.assertBodyContains({ email: 'keeper@example.com', volumeUnit: 'L' })
+  })
+
+  test('an empty body is a 400 with an empty field', async ({ client, assert }) => {
+    const registered = await client.post('/api/v1/auth/register').json(credentials)
+
+    const response = await client
+      .patch('/api/v1/me')
+      .header('cookie', tokenCookie(registered))
+      .json({})
+
+    response.assertStatus(400)
+    assert.equal(response.body().errors[0].field, '')
+  })
+
+  test('without a token it is the exact 401', async ({ client }) => {
+    const response = await client.patch('/api/v1/me').json({ volumeUnit: 'usGal' })
+
+    response.assertStatus(401)
+    response.assertBody(unauthorized)
+  })
+})
