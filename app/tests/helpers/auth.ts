@@ -28,3 +28,6 @@ export function signWithTestSecret(jwt: SignJWT): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .sign(new TextEncoder().encode(env.get('JWT_SECRET')))
 }
+
+/** The exact 401 body, pinned as a literal so a change to the contract is deliberate. */
+export const unauthorized = { errors: [{ field: '', message: 'Unauthorized' }] }

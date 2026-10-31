@@ -4,11 +4,15 @@ import type { Assert } from '@japa/assert'
 import hash from '@adonisjs/core/services/hash'
 import { SignJWT } from 'jose'
 import { User } from '#models/user'
-import { jwtOf, signWithTestSecret, tokenCookie, tokenSetCookie } from '../helpers/auth.js'
+import {
+  jwtOf,
+  unauthorized,
+  signWithTestSecret,
+  tokenCookie,
+  tokenSetCookie,
+} from '../helpers/auth.js'
 
 const credentials = { email: 'keeper@example.com', password: 'a long passphrase' }
-
-const unauthorized = { errors: [{ field: '', message: 'Unauthorized' }] }
 
 test.group('Register', (group) => {
   group.each.setup(async () => {

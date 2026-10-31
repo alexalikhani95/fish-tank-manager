@@ -4,7 +4,7 @@ import type { ApiClient } from '@japa/api-client'
 import hash from '@adonisjs/core/services/hash'
 import { Tank } from '#models/tank'
 import { User } from '#models/user'
-import { jwtOf, tokenCookie } from '../helpers/auth.js'
+import { jwtOf, tokenCookie, unauthorized } from '../helpers/auth.js'
 
 const password = 'a long passphrase'
 
@@ -155,13 +155,19 @@ test.group('Tanks', (group) => {
    * The one that matters: a Tank belonging to someone else must look like it
    * does not exist, on every route (docs/design/hld.md → Ownership).
    */
-  test("another user's tank is a 404, not a 403", async ({ client }) => {
+  test("another user's tank is a 404, not a 403", async ({ client, assert }) => {
     const other = await createLoggedInUser(client, 'other@example.com')
     const theirs = await Tank.create({
       name: 'Not yours',
       volumeLitres: 100,
       userId: other.user._id,
     })
+
+    // Positive control: the real owner reaches it, so the keeper's 404 is about ownership.
+    const owner = await client
+      .get(`/api/v1/tanks/${theirs.id}`)
+      .header('cookie', tokenCookie(other.login))
+    owner.assertStatus(200)
 
     for (const response of [
       await client.get(`/api/v1/tanks/${theirs.id}`).header('cookie', cookie),
@@ -173,6 +179,10 @@ test.group('Tanks', (group) => {
     ]) {
       response.assertStatus(404)
     }
+
+    // Untouched: a 404 that still wrote or deleted would be a leak.
+    const after = await Tank.findById(theirs.id)
+    assert.equal(after?.name, 'Not yours')
   })
 
   test('every tank route without a token is the exact 401', async ({ client }) => {
@@ -186,14 +196,21 @@ test.group('Tanks', (group) => {
       await client.delete(`/api/v1/tanks/${id}`),
     ]) {
       response.assertStatus(401)
-      response.assertBody({ errors: [{ field: '', message: 'Unauthorized' }] })
+      response.assertBody(unauthorized)
     }
   })
 
-  test('accepts an Authorization: Bearer header with no cookie', async ({ client }) => {
+  test('accepts an Authorization: Bearer header with no cookie', async ({ client, assert }) => {
+    await Tank.create({ name: 'Mine', volumeLitres: 40, userId })
+    await Tank.create({ name: 'Someone else', volumeLitres: 40, userId: new Types.ObjectId() })
+
     const response = await client.get('/api/v1/tanks').bearerToken(jwt)
 
     response.assertStatus(200)
+    assert.deepEqual(
+      response.body().map((tank: { name: string }) => tank.name),
+      ['Mine']
+    )
   })
 
   test('an id that is not an ObjectId is a 404, not a 500', async ({ client }) => {
