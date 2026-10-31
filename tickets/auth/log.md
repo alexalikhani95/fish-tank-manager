@@ -25,6 +25,16 @@ build 04 · sonnet · 64952
 review 04 · opus · 75549
 VERDICT review-04 blockers=0 total=4 file=tickets/auth/checks/review-04.md
 fix 04 · sonnet · 71773
-re-review 04 · opus · n/a
+re-review 04 · opus · 79112
 VERDICT review-04b blockers=0 total=0 file=tickets/auth/checks/review-04.md
 built 04 8f618c8
+build 05 · opus · 114606
+review 05 · opus · 127893
+VERDICT review-05 blockers=0 total=3 file=tickets/auth/checks/review-05.md
+fix 05 · opus · 130294
+re-review 05 · opus · 135428
+VERDICT review-05b blockers=0 total=1 file=tickets/auth/checks/review-05.md
+fix 05b · opus · 138333
+re-review 05 · opus · n/a
+VERDICT review-05c blockers=0 total=0 file=tickets/auth/checks/review-05.md
+built 05 7a0859b

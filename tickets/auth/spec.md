@@ -172,3 +172,15 @@ From ticket 04 (`1894982`):
 - **Shared test helpers live in `app/tests/helpers/auth.ts`** (the expected 401 literal `unauthorized`, `tokenSetCookie`, `tokenCookie`, `jwtOf`, `signWithTestSecret`), imported as `../helpers/auth.js` (no `#tests` alias). `createLoggedInUser` is still local to `tanks.spec.ts`; move it there rather than copy it.
 - **`group.each.setup` receives the test**: reach the API client through `t.context.client`.
 - **`DEV_USER_ID` is gone**; the local `fishtank_dev` Tanks were deleted (`deletedCount: 1`).
+
+From ticket 05 (`077926c`):
+
+- **`emailRule` in `user:set-password` is defensive only:** Mongoose applies the schema's `lowercase`/`trim` setters to query filters, so a raw-argument lookup also passes every test. Kept because the spec requires it.
+- **The ace kernel's prompt is a singleton** across every command made from `app.container.make('ace')`. Unfired traps leak into the next test (clear `prompt.traps.prompts`); an untrapped prompt hangs until the 30 s test timeout. Trap every prompt.
+- **Commands are found automatically** from `app/commands/` (core FsLoader); no `adonisrc.ts` entry, no ace manifest to track.
+- **A test file that fails at import time hangs the runner** (Mongo stays connected). This was already true before this ticket.
+- **One full `npm test` run took 17 min with 2 Mongo connection errors**; later runs passed 55/55 in 3–7 s. Cause not yet known; checked in review-05 and step 5.
+- **The 17-minute run (review-05):** three full runs passed 55/55 in 4 s each. The likely cause was a spec failing at import while the command was half-written. An orphaned `node ace serve` from ticket 03's `routes.d.ts` regeneration was also found and stopped. **Always stop a server you boot.**
+- **`user:set-password` needs the full app env** (`MONGO_URL`, `JWT_SECRET`, `APP_KEY`, …). On Lambda (ADR-0004) there is no server shell; Phase 2 must say where the keeper runs it.
+- **One failing ace test can fail every later test in its file:** `@japa/plugin-adonisjs` verifies the shared prompt's traps after each test but never clears them. Read the first failure; the rest may be echoes.
+- **`BaseCommand.exec()` never rethrows:** an in-process command test that checks only `assertFailed()` also passes when the command crashed. Check `command.error` too. Also flush `ace.ui.logger` logs per command, since the UI is shared.
