@@ -21,7 +21,7 @@
 
 | Area            | State                                                                                                                                                                    | Last verified |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| Product plan    | written — PRD, PLAN, CONTEXT, hld, lld, ADR-0002 to ADR-0009                                                                                                             | 2026-10-18    |
+| Product plan    | written — PRD, PLAN, CONTEXT, hld, lld, ADR-0002 to ADR-0009                                                                                                             | 2026-10-31    |
 | App             | API scaffolded — AdonisJS 7 + Mongoose, Tanks CRUD, Zod validation, JWT auth (register, login, logout, `me`, `user:set-password`), 56 tests green; `web/` not scaffolded | 2026-10-31    |
 | CI (PR checks)  | not created                                                                                                                                                              | 2026-10-18    |
 | Deploy pipeline | not created                                                                                                                                                              | 2026-10-18    |

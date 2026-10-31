@@ -38,3 +38,6 @@ fix 05b · opus · 138333
 re-review 05 · opus · n/a
 VERDICT review-05c blockers=0 total=0 file=tickets/auth/checks/review-05.md
 built 05 7a0859b
+ponytail-review · sonnet · 47371
+VERDICT ponytail blockers=0 total=3 file=tickets/auth/checks/ponytail.md
+docs pass · sonnet · 68365
