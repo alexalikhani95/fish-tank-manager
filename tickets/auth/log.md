@@ -12,3 +12,10 @@ fix 01 · opus · 134305
 re-review 01 · opus · 96463
 VERDICT review-01b blockers=0 total=1 file=tickets/auth/checks/review-01.md
 built 01 25fa49f
+build 02 · sonnet · 62064
+review 02 · opus · 88823
+VERDICT review-02 blockers=0 total=7 file=tickets/auth/checks/review-02.md
+fix 02 · sonnet · 73763
+re-review 02 · opus · n/a
+VERDICT review-02b blockers=0 total=0 file=tickets/auth/checks/review-02.md
+built 02 b96fb75

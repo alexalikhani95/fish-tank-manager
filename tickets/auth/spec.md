@@ -156,3 +156,13 @@ From ticket 01 (`59128db`):
 - **Closed sign-up and malformed JSON (review-01 F4, accepted):** the global body parser runs before the controller, so a closed sign-up answers unparseable JSON (`{bad`) with the parser's 400, not 403. "Even for an invalid body" means schema-invalid. It leaks nothing: the same 400 happens while sign-up is open.
 - **Ticket 02 owes review-01 F6:** the register test that sends unknown keys (`tokenVersion: 7`, add `passwordHash: 'x'`) must prove they were stripped, by logging in with the sent password once login exists.
 - **Tests may build more tokens than expired and tampered ones (review-01 N1):** `signWithTestSecret` in `app/tests/functional/auth.spec.ts` also builds a bad-`sub`, a no-`exp` and a string-`tokenVersion` token, each of which must be a 401. They are on-spec; keep them.
+
+From ticket 02 (`d102a64`):
+
+- **The 401 body has one home: `UNAUTHORIZED_BODY` in `#services/auth_token`.** Import it; never inline it. `COOKIE_ATTRIBUTES` there feeds both `setTokenCookie` and `clearTokenCookie`.
+- **`AuthController` holds module-level state** (the lazy dummy-hash promise). A test that fakes `hash` must account for it.
+- **Login's dummy-hash verify is load-bearing and untested (review-02 F3, accepted):** a rewrite that returns early for an unknown email keeps every test green. Timing tests are flaky and the spec rules out testing hashing directly; the code comment is the guard.
+- **Another site can log the keeper out (review-02 F5, accepted):** logout needs no auth and reads no body, so a cross-site form POST clears the cookie. A nuisance, not a data risk; it follows from "logout needs no auth". Raised at stop 3.
+- **`app/.adonisjs/server/routes.d.ts` is tracked:** commit it regenerated whenever routes change, or the next boot leaves a stray diff.
+- **Regenerating `routes.d.ts`:** macOS has no `timeout`, so a wrapped boot can silently do nothing. Boot `node ace serve` with `.env.test` loaded, then check the file really lists the new routes.
+- **Lint rejects `_`-prefixed unused destructured names** (naming-convention rule). Copy and `delete` instead.
