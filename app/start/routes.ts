@@ -24,6 +24,10 @@ router
       })
     })
 
+    router.post('auth/register', [controllers.Auth, 'register'])
+
+    router.get('me', [controllers.Me, 'show']).use(middleware.auth())
+
     router
       .group(() => {
         router.get('tanks', [controllers.Tanks, 'index'])

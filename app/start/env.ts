@@ -23,6 +23,14 @@ export default await Env.create(new URL('../', import.meta.url), {
   APP_KEY: Env.schema.secret(),
   APP_URL: Env.schema.string({ format: 'url', tld: false }),
 
+  // Signs the login token (ADR-0009). Refused at boot when missing or short.
+  JWT_SECRET: (key: string, value?: string) => {
+    if (!value || value.length < 32) {
+      throw new Error(`${key} must be at least 32 characters (e.g. openssl rand -base64 48)`)
+    }
+    return value
+  },
+
   // MongoDB — the only database (ADR-0002)
   MONGO_URL: Env.schema.string(),
 

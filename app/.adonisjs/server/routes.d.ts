@@ -4,28 +4,33 @@ type ParamValue = string | number | bigint | boolean
 
 export type ScannedRoutes = {
   ALL: {
+    'auth.register': { paramsTuple?: []; params?: {} }
+    'me.show': { paramsTuple?: []; params?: {} }
     'tanks.index': { paramsTuple?: []; params?: {} }
     'tanks.store': { paramsTuple?: []; params?: {} }
-    'tanks.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'tanks.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'tanks.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'tanks.show': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
+    'tanks.update': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
+    'tanks.destroy': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
   }
   GET: {
+    'me.show': { paramsTuple?: []; params?: {} }
     'tanks.index': { paramsTuple?: []; params?: {} }
-    'tanks.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'tanks.show': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
   }
   HEAD: {
+    'me.show': { paramsTuple?: []; params?: {} }
     'tanks.index': { paramsTuple?: []; params?: {} }
-    'tanks.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'tanks.show': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
   }
   POST: {
+    'auth.register': { paramsTuple?: []; params?: {} }
     'tanks.store': { paramsTuple?: []; params?: {} }
   }
   PATCH: {
-    'tanks.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'tanks.update': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
   }
   DELETE: {
-    'tanks.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'tanks.destroy': { paramsTuple: [ParamValue]; params: {'tankId': ParamValue} }
   }
 }
 declare module '@adonisjs/core/types/http' {
