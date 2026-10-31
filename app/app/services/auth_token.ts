@@ -39,10 +39,13 @@ export async function setTokenCookie(
   })
 }
 
-/** The token's claims, or null when the signature or expiry is bad. */
+/** The token's claims, or null when the signature, expiry or subject is bad or missing. */
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] })
+    const { payload } = await jwtVerify(token, secret, {
+      algorithms: ['HS256'],
+      requiredClaims: ['exp', 'sub'],
+    })
     return payload
   } catch {
     return null

@@ -1,6 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
-import type { Types } from 'mongoose'
+import { isObjectIdOrHexString, type Types } from 'mongoose'
 import { User } from '#models/user'
 import { TOKEN_COOKIE, verifyToken } from '#services/auth_token'
 
@@ -24,14 +24,19 @@ export default class AuthMiddleware {
 }
 
 async function findUser(request: HttpContext['request']) {
-  const authorization = request.header('authorization')
+  // Raw cookie values: the JWT is stored unsigned and unencoded. Presence is the
+  // key existing, so an empty `token=` is a 401, not a fall-through to the header.
+  const cookies = request.cookiesList()
   const token =
-    request.plainCookie(TOKEN_COOKIE, { encoded: false }) ??
-    (authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined)
+    TOKEN_COOKIE in cookies
+      ? cookies[TOKEN_COOKIE]
+      : /^Bearer (.+)$/i.exec(request.header('authorization') ?? '')?.[1]
   if (!token) return null
 
   const claims = await verifyToken(token)
-  if (!claims) return null
+  if (!claims || !isObjectIdOrHexString(claims.sub) || typeof claims.tokenVersion !== 'number') {
+    return null
+  }
 
   // A deleted User, or a tokenVersion bumped since the token was signed, is a 401.
   const user = await User.findById(claims.sub)

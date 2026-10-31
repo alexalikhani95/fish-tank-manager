@@ -29,6 +29,13 @@ function jwtOf(response: ApiResponse): string {
   return tokenCookie(response).slice('token='.length)
 }
 
+/** The only tokens tests build themselves: signed with the test JWT_SECRET. */
+function signWithTestSecret(jwt: SignJWT): Promise<string> {
+  return jwt
+    .setProtectedHeader({ alg: 'HS256' })
+    .sign(new TextEncoder().encode(env.get('JWT_SECRET')))
+}
+
 test.group('Register', (group) => {
   group.each.setup(async () => {
     await User.deleteMany({})
@@ -182,11 +189,11 @@ test.group('Me', (group) => {
 
   test('is a 401 with an expired token', async ({ client }) => {
     const registered = await client.post('/api/v1/auth/register').json(credentials)
-    const expired = await new SignJWT({ tokenVersion: 0 })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setSubject(registered.body()._id)
-      .setExpirationTime(Math.floor(Date.now() / 1000) - 60)
-      .sign(new TextEncoder().encode(env.get('JWT_SECRET')))
+    const expired = await signWithTestSecret(
+      new SignJWT({ tokenVersion: 0 })
+        .setSubject(registered.body()._id)
+        .setExpirationTime(Math.floor(Date.now() / 1000) - 60)
+    )
 
     const response = await client.get('/api/v1/me').header('cookie', `token=${expired}`)
 
@@ -214,14 +221,47 @@ test.group('Me', (group) => {
     response.assertBody(unauthorized)
   })
 
-  test('tries only the cookie when one is sent', async ({ client }) => {
+  test('tries only the cookie when one is sent, even an empty one', async ({ client }) => {
+    const registered = await client.post('/api/v1/auth/register').json(credentials)
+
+    for (const cookie of ['token=not-a-jwt', 'token=']) {
+      const response = await client
+        .get('/api/v1/me')
+        .header('cookie', cookie)
+        .bearerToken(jwtOf(registered))
+
+      response.assertStatus(401)
+      response.assertBody(unauthorized)
+    }
+  })
+
+  test('matches the bearer scheme in any case', async ({ client }) => {
     const registered = await client.post('/api/v1/auth/register').json(credentials)
 
     const response = await client
       .get('/api/v1/me')
-      .header('cookie', 'token=not-a-jwt')
-      .bearerToken(jwtOf(registered))
+      .header('authorization', `bearer ${jwtOf(registered)}`)
 
-    response.assertStatus(401)
+    response.assertStatus(200)
+  })
+
+  test('is a 401 for a signed token with a bad subject or no expiry', async ({ client }) => {
+    const registered = await client.post('/api/v1/auth/register').json(credentials)
+    const inAnHour = Math.floor(Date.now() / 1000) + 3600
+
+    for (const token of [
+      new SignJWT({ tokenVersion: 0 }).setSubject('nope').setExpirationTime(inAnHour),
+      new SignJWT({ tokenVersion: 0 }).setSubject(registered.body()._id),
+      new SignJWT({ tokenVersion: '0' })
+        .setSubject(registered.body()._id)
+        .setExpirationTime(inAnHour),
+    ]) {
+      const response = await client
+        .get('/api/v1/me')
+        .header('cookie', `token=${await signWithTestSecret(token)}`)
+
+      response.assertStatus(401)
+      response.assertBody(unauthorized)
+    }
   })
 })
