@@ -138,3 +138,21 @@ The keeper registers their User once with an email and password, then logs in an
 ## Stop 2 decisions
 
 - Tickets approved as written (5 tickets).
+
+## Discovered
+
+From ticket 01 (`59128db`):
+
+- **Logout: `response.clearCookie` silently merges the app cookie defaults** (`secure` only in production). Pass the same explicit options as `setTokenCookie` (`path: '/'`, `domain: ''`, `secure: true`, `sameSite: 'lax'`, `httpOnly: true`), or over http the Secure cookie isn't overwritten. No error, and header-only tests may not notice.
+- **Login must reuse `setTokenCookie` from `#services/auth_token`**, not a second signer. The exact 401 body is currently inline in `app/app/middleware/auth_middleware.ts`; login must match it character for character (export it from one place).
+- **The body parser no longer trims anything.** Every new string field must `.trim()` in its own Zod schema. `convertEmptyStringsToNull` is still on: `""` arrives as `null`.
+- **Tanks: a bad id is a 404 before any middleware runs** (`.where('tankId', /^[0-9a-f]{24}$/i)`), so "needs auth" tests must use a valid-looking id.
+- **Test helpers:** the cookie helpers (`tokenSetCookie`, `tokenCookie`, `jwtOf`) live only in `app/tests/functional/auth.spec.ts`; move them to a shared helper for the Tanks tests, don't copy. Japa types `set-cookie` as `string` but it is an array at runtime (`[x ?? []].flat()`). A second User is `User.create({ email, passwordHash: await hash.make(...) })`. Each group must `User.deleteMany({})`.
+- **Ticket 04:** swap `.use(middleware.currentUser())` for `.use(middleware.auth())`, then delete `current_user_middleware.ts`, its `kernel.ts` entry, `DEV_USER_ID` in `env.ts`, `.env.example` and `.env.test`. The `ctx.userId` type already lives in `auth_middleware.ts`.
+- **`PATCH me`:** `ctx.user` is a full Mongoose document; `set` + `save` works, `toJSON` strips private fields.
+- **`user:set-password`:** import `emailRule` and `passwordRule` from `#validators/auth_validator`; needs `startApp: true`; revoke by incrementing `tokenVersion` (middleware compares with `!==`).
+- **Booting `bin/server.ts` creates an untracked `app/.adonisjs/server/routes.json`.** Never stage it.
+- **`npm run dev` now needs `JWT_SECRET` in `app/.env`** (≥ 32 chars) — in every checkout.
+- **Closed sign-up and malformed JSON (review-01 F4, accepted):** the global body parser runs before the controller, so a closed sign-up answers unparseable JSON (`{bad`) with the parser's 400, not 403. "Even for an invalid body" means schema-invalid. It leaks nothing: the same 400 happens while sign-up is open.
+- **Ticket 02 owes review-01 F6:** the register test that sends unknown keys (`tokenVersion: 7`, add `passwordHash: 'x'`) must prove they were stripped, by logging in with the sent password once login exists.
+- **Tests may build more tokens than expired and tampered ones (review-01 N1):** `signWithTestSecret` in `app/tests/functional/auth.spec.ts` also builds a bad-`sub`, a no-`exp` and a string-`tokenVersion` token, each of which must be a 401. They are on-spec; keep them.
