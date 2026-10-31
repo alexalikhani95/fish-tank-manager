@@ -2,7 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import hash from '@adonisjs/core/services/hash'
 import { mongo } from 'mongoose'
 import { User } from '#models/user'
-import { setTokenCookie } from '#services/auth_token'
+import { clearTokenCookie, setTokenCookie, UNAUTHORIZED_BODY } from '#services/auth_token'
 import { credentialsSchema } from '#validators/auth_validator'
 
 export default class AuthController {
@@ -32,4 +32,28 @@ export default class AuthController {
     await setTokenCookie(response, user)
     return response.created(user)
   }
+
+  /** POST /api/v1/auth/login. A wrong password and an unknown email look the same. */
+  async login({ request, response }: HttpContext) {
+    const { email, password } = credentialsSchema.parse(request.body())
+    const user = await User.findOne({ email })
+    // An unknown email still verifies against a dummy hash, so timing doesn't give it away.
+    const valid = await hash.verify(user?.passwordHash ?? (await dummyHash()), password)
+    if (!user || !valid) return response.unauthorized(UNAUTHORIZED_BODY)
+
+    await setTokenCookie(response, user)
+    return user
+  }
+
+  /** POST /api/v1/auth/logout. No auth, so a stale cookie is cleared too. */
+  async logout({ response }: HttpContext) {
+    clearTokenCookie(response)
+    return response.noContent()
+  }
+}
+
+let dummyHashPromise: Promise<string> | undefined
+function dummyHash() {
+  dummyHashPromise ??= hash.make('dummy password')
+  return dummyHashPromise
 }

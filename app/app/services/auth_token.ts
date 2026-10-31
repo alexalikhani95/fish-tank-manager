@@ -8,8 +8,20 @@ import env from '#start/env'
  */
 export const TOKEN_COOKIE = 'token'
 
+/** The one 401 body: the auth middleware and a failed login both send it. */
+export const UNAUTHORIZED_BODY = { errors: [{ field: '', message: 'Unauthorized' }] }
+
 const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
 const secret = new TextEncoder().encode(env.get('JWT_SECRET'))
+
+const COOKIE_ATTRIBUTES = {
+  encode: false,
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax',
+  path: '/',
+  domain: '',
+} as const
 
 /**
  * Signs a token for the User and sets it as the `token` cookie.
@@ -29,14 +41,14 @@ export async function setTokenCookie(
     .sign(secret)
 
   response.plainCookie(TOKEN_COOKIE, token, {
-    encode: false,
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
+    ...COOKIE_ATTRIBUTES,
     maxAge: THIRTY_DAYS_IN_SECONDS,
-    domain: '',
   })
+}
+
+/** Clears the cookie. Same attributes as setTokenCookie: clearCookie merges app defaults otherwise. */
+export function clearTokenCookie(response: HttpContext['response']) {
+  response.clearCookie(TOKEN_COOKIE, COOKIE_ATTRIBUTES)
 }
 
 /** The token's claims, or null when the signature, expiry or subject is bad or missing. */

@@ -2,7 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
 import { isObjectIdOrHexString, type Types } from 'mongoose'
 import { User } from '#models/user'
-import { TOKEN_COOKIE, verifyToken } from '#services/auth_token'
+import { TOKEN_COOKIE, UNAUTHORIZED_BODY, verifyToken } from '#services/auth_token'
 
 /**
  * Puts the logged-in User on the request, or answers 401 (ADR-0009).
@@ -15,7 +15,7 @@ export default class AuthMiddleware {
   async handle(ctx: HttpContext, next: NextFn) {
     const user = await findUser(ctx.request)
     if (!user) {
-      return ctx.response.unauthorized({ errors: [{ field: '', message: 'Unauthorized' }] })
+      return ctx.response.unauthorized(UNAUTHORIZED_BODY)
     }
     ctx.user = user
     ctx.userId = user._id

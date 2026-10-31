@@ -25,6 +25,8 @@ router
     })
 
     router.post('auth/register', [controllers.Auth, 'register'])
+    router.post('auth/login', [controllers.Auth, 'login'])
+    router.post('auth/logout', [controllers.Auth, 'logout'])
 
     router.get('me', [controllers.Me, 'show']).use(middleware.auth())
 
