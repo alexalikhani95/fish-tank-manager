@@ -16,6 +16,8 @@ build 02 · sonnet · 62064
 review 02 · opus · 88823
 VERDICT review-02 blockers=0 total=7 file=tickets/auth/checks/review-02.md
 fix 02 · sonnet · 73763
-re-review 02 · opus · n/a
+re-review 02 · opus · 93978
 VERDICT review-02b blockers=0 total=0 file=tickets/auth/checks/review-02.md
 built 02 b96fb75
+build 03 · sonnet · 56509
+built 03 f01f2d6
