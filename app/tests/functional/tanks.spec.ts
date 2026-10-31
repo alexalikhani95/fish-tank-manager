@@ -1,19 +1,8 @@
 import { test } from '@japa/runner'
 import { Types } from 'mongoose'
-import type { ApiClient } from '@japa/api-client'
-import hash from '@adonisjs/core/services/hash'
 import { Tank } from '#models/tank'
 import { User } from '#models/user'
-import { jwtOf, tokenCookie, unauthorized } from '../helpers/auth.js'
-
-const password = 'a long passphrase'
-
-/** A real User made through the model (sign-up closes after the first), logged in over HTTP. */
-async function createLoggedInUser(client: ApiClient, email: string) {
-  const user = await User.create({ email, passwordHash: await hash.make(password) })
-  const login = await client.post('/api/v1/auth/login').json({ email, password })
-  return { user, login }
-}
+import { createLoggedInUser, jwtOf, tokenCookie, unauthorized } from '../helpers/auth.js'
 
 test.group('Tanks', (group) => {
   let userId: Types.ObjectId

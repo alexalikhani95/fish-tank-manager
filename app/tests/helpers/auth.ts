@@ -1,5 +1,7 @@
-import type { ApiResponse } from '@japa/api-client'
+import type { ApiClient, ApiResponse } from '@japa/api-client'
 import type { SignJWT } from 'jose'
+import hash from '@adonisjs/core/services/hash'
+import { User } from '#models/user'
 import env from '#start/env'
 
 /** The `token` Set-Cookie line, if the response set one. */
@@ -31,3 +33,12 @@ export function signWithTestSecret(jwt: SignJWT): Promise<string> {
 
 /** The exact 401 body, pinned as a literal so a change to the contract is deliberate. */
 export const unauthorized = { errors: [{ field: '', message: 'Unauthorized' }] }
+
+export const password = 'a long passphrase'
+
+/** A real User made through the model (sign-up closes after the first), logged in over HTTP. */
+export async function createLoggedInUser(client: ApiClient, email: string) {
+  const user = await User.create({ email, passwordHash: await hash.make(password) })
+  const login = await client.post('/api/v1/auth/login').json({ email, password })
+  return { user, login }
+}
