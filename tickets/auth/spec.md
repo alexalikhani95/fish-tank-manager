@@ -166,3 +166,9 @@ From ticket 02 (`d102a64`):
 - **`app/.adonisjs/server/routes.d.ts` is tracked:** commit it regenerated whenever routes change, or the next boot leaves a stray diff.
 - **Regenerating `routes.d.ts`:** macOS has no `timeout`, so a wrapped boot can silently do nothing. Boot `node ace serve` with `.env.test` loaded, then check the file really lists the new routes.
 - **Lint rejects `_`-prefixed unused destructured names** (naming-convention rule). Copy and `delete` instead.
+
+From ticket 04 (`1894982`):
+
+- **Shared test helpers live in `app/tests/helpers/auth.ts`** (the expected 401 literal `unauthorized`, `tokenSetCookie`, `tokenCookie`, `jwtOf`, `signWithTestSecret`), imported as `../helpers/auth.js` (no `#tests` alias). `createLoggedInUser` is still local to `tanks.spec.ts`; move it there rather than copy it.
+- **`group.each.setup` receives the test**: reach the API client through `t.context.client`.
+- **`DEV_USER_ID` is gone**; the local `fishtank_dev` Tanks were deleted (`deletedCount: 1`).

@@ -21,3 +21,10 @@ VERDICT review-02b blockers=0 total=0 file=tickets/auth/checks/review-02.md
 built 02 b96fb75
 build 03 · sonnet · 56509
 built 03 f01f2d6
+build 04 · sonnet · 64952
+review 04 · opus · 75549
+VERDICT review-04 blockers=0 total=4 file=tickets/auth/checks/review-04.md
+fix 04 · sonnet · 71773
+re-review 04 · opus · n/a
+VERDICT review-04b blockers=0 total=0 file=tickets/auth/checks/review-04.md
+built 04 8f618c8
