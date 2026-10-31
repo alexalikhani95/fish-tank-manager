@@ -1,6 +1,6 @@
 # 0008. AdonisJS 7 `api` starter, stripped, instead of the v6 slim starter
 
-- **Status:** Accepted
+- **Status:** Accepted — "`@adonisjs/auth` comes back" superseded by ADR-0009
 - **Date:** 2026-10-18
 
 ## Context
