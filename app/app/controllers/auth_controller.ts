@@ -38,7 +38,9 @@ export default class AuthController {
     const { email, password } = credentialsSchema.parse(request.body())
     const user = await User.findOne({ email })
     // An unknown email still verifies against a dummy hash, so timing doesn't give it away.
-    const valid = await hash.verify(user?.passwordHash ?? (await dummyHash()), password)
+    // Awaited on every login, before branching, so found and unknown emails do the same work.
+    const fallback = await dummyHash()
+    const valid = await hash.verify(user?.passwordHash ?? fallback, password)
     if (!user || !valid) return response.unauthorized(UNAUTHORIZED_BODY)
 
     await setTokenCookie(response, user)

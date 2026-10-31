@@ -5,6 +5,8 @@ type ParamValue = string | number | bigint | boolean
 export type ScannedRoutes = {
   ALL: {
     'auth.register': { paramsTuple?: []; params?: {} }
+    'auth.login': { paramsTuple?: []; params?: {} }
+    'auth.logout': { paramsTuple?: []; params?: {} }
     'me.show': { paramsTuple?: []; params?: {} }
     'tanks.index': { paramsTuple?: []; params?: {} }
     'tanks.store': { paramsTuple?: []; params?: {} }
@@ -24,6 +26,8 @@ export type ScannedRoutes = {
   }
   POST: {
     'auth.register': { paramsTuple?: []; params?: {} }
+    'auth.login': { paramsTuple?: []; params?: {} }
+    'auth.logout': { paramsTuple?: []; params?: {} }
     'tanks.store': { paramsTuple?: []; params?: {} }
   }
   PATCH: {

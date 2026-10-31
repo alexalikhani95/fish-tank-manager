@@ -84,10 +84,17 @@ test.group('Register', (group) => {
     response.assertStatus(201)
     response.assertBodyContains({ volumeUnit: 'L' })
 
-    // passwordHash and tokenVersion were stripped: the sent password logs in, and its cookie works.
+    // passwordHash was stripped: the sent password logs in (a stored 'x' would fail to verify).
     const login = await client.post('/api/v1/auth/login').json(credentials)
     login.assertStatus(200)
-    const me = await client.get('/api/v1/me').header('cookie', tokenCookie(login))
+
+    // tokenVersion was stripped: only a stored 0 accepts a token signed with 0.
+    const token = await signWithTestSecret(
+      new SignJWT({ tokenVersion: 0 })
+        .setSubject(response.body()._id)
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
+    )
+    const me = await client.get('/api/v1/me').header('cookie', `token=${token}`)
     me.assertStatus(200)
   })
 
@@ -312,8 +319,15 @@ test.group('Login', (group) => {
     unknownEmail.assertStatus(401)
     wrongPassword.assertBody(unauthorized)
     assert.deepEqual(unknownEmail.body(), wrongPassword.body())
-    assert.isUndefined(tokenSetCookie(wrongPassword))
-    assert.isUndefined(tokenSetCookie(unknownEmail))
+    assert.isUndefined(wrongPassword.headers()['set-cookie'])
+    assert.isUndefined(unknownEmail.headers()['set-cookie'])
+    const withoutVolatile = (response: ApiResponse) => {
+      const headers = { ...response.headers() }
+      delete headers['x-request-id']
+      delete headers.date
+      return headers
+    }
+    assert.deepEqual(withoutVolatile(unknownEmail), withoutVolatile(wrongPassword))
   })
 
   test('rejects an invalid body, naming the field', async ({ client, assert }) => {
@@ -337,7 +351,8 @@ test.group('Login', (group) => {
 
   test('passwords are never trimmed: a trailing space must match', async ({ client }) => {
     const password = `${'x'.repeat(11)} `
-    await client.post('/api/v1/auth/register').json({ ...credentials, password })
+    const registered = await client.post('/api/v1/auth/register').json({ ...credentials, password })
+    registered.assertStatus(201)
 
     const exact = await client.post('/api/v1/auth/login').json({ ...credentials, password })
     const trimmed = await client
