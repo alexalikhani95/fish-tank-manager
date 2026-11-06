@@ -70,9 +70,9 @@ One service call: delete the Tank, its WaterChanges, its WaterTests, and its S3 
 
 **Ownership.** Single-user: there is no tenant above the User. Every tank-owned document carries `userId` alongside `tankId`. A tank-scoped route loads the Tank by `(tankId, userId)` first; **a Tank that isn't the caller's returns 404, never 403** — the caller must not learn it exists. 403 is used only for closed sign-up (no roles). If sharing ever arrives, the tenant slots in between User and Tank (`PLAN.md` → Stretch).
 
-**Auth.** One route middleware, no `@adonisjs/auth` guard (ADR-0009). HS256, 30-day expiry, secret from env. The token is delivered as an `httpOnly; Secure; SameSite=Lax` cookie and the middleware falls back to an `Authorization: Bearer` header for future native clients (ADR-0006). No sessions, refresh tokens, or token table — the API stays stateless. `POST auth/logout` clears the cookie; a `tokenVersion` claim checked against `User.tokenVersion` revokes every token a User holds. CSRF: `SameSite=Lax` plus a JSON-only API, no CSRF token in v1.
+**Auth.** One route middleware, no `@adonisjs/auth` guard (ADR-0009). HS256, 30-day expiry, secret from env. The token is delivered as an `httpOnly; Secure; SameSite=Lax` cookie and the middleware falls back to an `Authorization: Bearer` header for future native clients (ADR-0006). No sessions, refresh tokens, or token table — the API stays stateless. `POST auth/logout` clears the cookie; a `tokenVersion` claim checked against `User.tokenVersion` revokes every token a User holds. CSRF: `SameSite=Lax` plus a JSON-only API (ADR-0011), no CSRF token in v1.
 
-**Validation.** Zod at every request boundary (ADR-0007). Sign-up closes by itself once a User exists (`lld.md` → Auth hardening). `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
+**Validation.** Zod at every request boundary (ADR-0007). Sign-up closes by itself once a User exists (ADR-0010; `lld.md` → Auth hardening). `readings` keys and `volumeUnit`/`temperatureUnit` values are constrained in both the validator and the Mongoose schema.
 
 **Derived, never stored.** Last water change, last test, litres replaced by a water change, trends, gallons, °F. Anything computable from the log is computed.
 

@@ -111,8 +111,8 @@ The API never calls these. The client calls `to*` before submit and `from*` on d
 
 **Auth hardening.** Three rules, no rate limiter:
 
-- Sign-up closes automatically: `POST auth/register` returns 403 once any User exists, so there is no flag to forget — a closed endpoint beats a throttled one, and this app has exactly one intended User. Two first sign-ups racing on an empty database could both succeed; accepted.
-- Password 12–256 characters, checked in the Zod schema and counted exactly as sent (the JSON body parser does not trim). Length only: no forced symbols or capitals, per current guidance.
+- Sign-up closes automatically: `POST auth/register` returns 403 once any User exists, with no env flag (ADR-0010). Two first sign-ups racing on an empty database could both succeed; accepted.
+- Password 12–256 characters, checked in the Zod schema and counted exactly as sent (the JSON body parser does not trim, ADR-0011). Length only: no forced symbols or capitals, per current guidance.
 - `node ace user:set-password <email>` for recovery, because `PRD.md` puts password reset out of v1 — without it a forgotten password means editing the database by hand. Lives in `app/commands/`: normalise the email (same rule as the API) → look up the User → hidden `New password` and `Confirm password` prompts → mismatch or outside 12–256 → one `updateOne` with `$set` the new hash and `$inc` `tokenVersion` (signs out every device). Every refusal exits 1 and changes nothing. It boots the whole app, so it needs the full env wherever it runs.
 
 No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-memory counter throttles per container rather than globally; a real limit means a Mongo write on every attempt, to guard the one password that can exist once registration is closed. Revisit if the app ever serves more than one keeper.
@@ -134,7 +134,7 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 - Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group — arrives with the first `tanks/:tankId/*` child route. Until then `TanksController` filters on `{ _id: tankId, userId }` itself. `:tankId` must be 24 hex characters (route matcher), so a malformed id is a 404, not a 500.
 - S3 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` in `app/services/photo_service.ts`. Bucket and region from env.
 - Runs on Lambda via Lambda Web Adapter (ADR-0004): the same Docker image as local, adapter copied into `/opt/extensions/`, readiness check on `/api/v1/health`. The Mongo connection opened at boot is reused across warm invocations.
-- Body parsing is JSON only (`config/bodyparser.ts`): no form or multipart parser, which makes true the JSON-only half of ADR-0006's CSRF defence. String trimming is off, so each Zod schema trims its own fields (email, Tank name).
+- Body parsing is JSON only (`config/bodyparser.ts`): no form or multipart parser, which makes true the JSON-only half of ADR-0006's CSRF defence (ADR-0011). String trimming is off, so each Zod schema trims its own fields (email, Tank name).
 - Commands under `app/commands/`, found automatically by ace and imported from tests through the `#commands/*` alias. Shared test helpers (cookie helpers, token signing, the expected 401 body) in `app/tests/helpers/auth.ts`.
 - Env validated at boot in `start/env.ts` (`MONGO_URL`, `APP_KEY`, `JWT_SECRET` — at least 32 characters, boot refuses without it — `PHOTOS_BUCKET`, `AWS_REGION`, …).
 - Tests: Japa. Unit for conversion and readings validation; functional (HTTP) against a Testcontainers Mongo, one container per test run, database dropped between suites. S3 calls stubbed in tests (presigner is pure — no network).
