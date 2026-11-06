@@ -41,3 +41,6 @@ built 05 7a0859b
 ponytail-review · sonnet · 47371
 VERDICT ponytail blockers=0 total=3 file=tickets/auth/checks/ponytail.md
 docs pass · sonnet · 68365
+pr review 1 · opus · 105661
+VERDICT pr-review-1 blockers=0 total=13 file=tickets/auth/checks/pr-review-1.md
+fix pr-review-1 S1 · sonnet · n/a
