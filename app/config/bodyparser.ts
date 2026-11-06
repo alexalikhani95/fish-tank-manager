@@ -1,40 +1,29 @@
 import { defineConfig } from '@adonisjs/core/bodyparser'
 
+/**
+ * JSON only. No form or multipart parsing: a cross-site HTML form can't send
+ * JSON, which is half of the CSRF defence the auth cookie relies on (ADR-0006).
+ * Photos go straight to S3 by presigned URL, so nothing needs multipart.
+ *
+ * `types: []` rather than deleting the keys: `defineConfig` merges the
+ * defaults back in for any key that is missing.
+ */
 const bodyParserConfig = defineConfig({
-  /**
-   * Parse request bodies for these HTTP methods.
-   * Keep this aligned with methods that receive payloads in your routes.
-   */
   allowedMethods: ['POST', 'PUT', 'PATCH', 'DELETE'],
 
-  /**
-   * Config for the "application/x-www-form-urlencoded"
-   * content-type parser.
-   */
   form: {
-    /**
-     * Normalize empty string values to null.
-     */
-    convertEmptyStringsToNull: true,
-
-    /**
-     * Content types handled by the form parser.
-     */
-    types: ['application/x-www-form-urlencoded'],
+    types: [],
   },
 
-  /**
-   * Config for the JSON parser.
-   */
   json: {
-    /**
-     * Normalize empty string values to null.
-     */
     convertEmptyStringsToNull: true,
 
     /**
-     * Content types handled by the JSON parser.
+     * Off so a password counts exactly as sent. Fields that should be trimmed
+     * (email, Tank name) say so in their Zod schema.
      */
+    trimWhitespaces: false,
+
     types: [
       'application/json',
       'application/json-patch+json',
@@ -43,35 +32,8 @@ const bodyParserConfig = defineConfig({
     ],
   },
 
-  /**
-   * Config for the "multipart/form-data" content-type parser.
-   * File uploads are handled by the multipart parser.
-   */
   multipart: {
-    /**
-     * Automatically process uploaded files into the system tmp directory.
-     */
-    autoProcess: true,
-
-    /**
-     * Normalize empty string values to null.
-     */
-    convertEmptyStringsToNull: true,
-
-    /**
-     * Routes where multipart processing is handled manually.
-     */
-    processManually: [],
-
-    /**
-     * Maximum accepted payload size for multipart requests.
-     */
-    limit: '20mb',
-
-    /**
-     * Content types handled by the multipart parser.
-     */
-    types: ['multipart/form-data'],
+    types: [],
   },
 })
 

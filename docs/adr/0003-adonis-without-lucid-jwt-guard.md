@@ -1,6 +1,6 @@
 # 0003. AdonisJS without Lucid; custom JWT guard over Mongoose
 
-- **Status:** Accepted — "slim starter" superseded by ADR-0008
+- **Status:** Accepted — "slim starter" superseded by ADR-0008; "custom guard over `@adonisjs/auth`" superseded by ADR-0009
 - **Date:** 2026-09-21
 
 ## Context

@@ -8,6 +8,10 @@ Single-user aquarium log. A User owns Tanks; each Tank has a log of WaterChanges
 The person who signs up and logs in. Owns Tanks; nothing is shared between Users. Carries the display preferences (volume unit, temperature unit) — these change how numbers are shown, never what is stored.
 _Avoid_: Keeper (the PRD's word for the persona, not the model), Account, Owner
 
+**Login token**:
+The proof a User is logged in — a signed JWT valid for 30 days, kept in a cookie (or sent as a bearer header). Carries the User's token version; bumping the User's `tokenVersion` revokes every token that User holds, on every device.
+_Avoid_: Session (there is no server-side session)
+
 **Tank**:
 One aquarium belonging to one User — name, volume, optional brand and model, one photo, its Fish and Plants. The aggregate root: WaterChanges and WaterTests belong to exactly one Tank and go with it when it is deleted.
 _Avoid_: Aquarium (as a synonym)

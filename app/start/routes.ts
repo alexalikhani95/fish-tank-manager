@@ -24,6 +24,17 @@ router
       })
     })
 
+    router.post('auth/register', [controllers.Auth, 'register'])
+    router.post('auth/login', [controllers.Auth, 'login'])
+    router.post('auth/logout', [controllers.Auth, 'logout'])
+
+    router
+      .group(() => {
+        router.get('me', [controllers.Me, 'show'])
+        router.patch('me', [controllers.Me, 'update'])
+      })
+      .use(middleware.auth())
+
     router
       .group(() => {
         router.get('tanks', [controllers.Tanks, 'index'])
@@ -34,6 +45,6 @@ router
       })
       // Not an ObjectId → no route matches → 404, instead of a Mongoose CastError → 500.
       .where('tankId', /^[0-9a-f]{24}$/i)
-      .use(middleware.currentUser())
+      .use(middleware.auth())
   })
   .prefix('/api/v1')

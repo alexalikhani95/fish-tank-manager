@@ -74,27 +74,27 @@ Adding a parameter is one row here. The form, the validator, the trend endpoint,
 
 ## API
 
-Base `/api/v1`. Authenticated by the JWT cookie — or a bearer header (ADR-0006) — on everything except `auth/*` and `health`. All `tanks/:tankId/*` routes load the Tank by `(tankId, userId)` first — see Ownership in `hld.md`. Lists are small (one keeper's data) and return the full set, newest first; add cursor pagination only when a real tank has more than a few hundred entries.
+Base `/api/v1`. Authenticated by the JWT cookie — or a bearer header (ADR-0006) — on everything except `auth/*` and `health`; the `auth` middleware (ADR-0009) checks it. Error bodies use the validation envelope with `field: ''`: 401 `Unauthorized`, 403 `Sign-up is closed`, 409 `Email already registered`. All `tanks/:tankId/*` routes load the Tank by `(tankId, userId)` first — see Ownership in `hld.md`. Lists are small (one keeper's data) and return the full set, newest first; add cursor pagination only when a real tank has more than a few hundred entries.
 
-| Method               | Route                             | Notes                                                                                                          |
-| -------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| POST                 | `auth/register`, `auth/login`     | `{ email, password }` → User; JWT set as an httpOnly cookie (ADR-0006)                                         |
-| POST                 | `auth/logout`                     | clears the cookie                                                                                              |
-| GET / PATCH          | `me`                              | PATCH: `volumeUnit`, `temperatureUnit`                                                                         |
-| GET                  | `health`                          | `{ status, database }`; 503 if the Mongo connection drops after boot (boot itself waits for Mongo)             |
-| GET / POST           | `tanks`                           | GET returns dashboard summaries (see below)                                                                    |
-| GET / PATCH / DELETE | `tanks/:tankId`                   | DELETE cascades; PATCH replaces `fish` / `plants` wholesale                                                    |
-| POST                 | `tanks/:tankId/photo`             | `{ contentType, size }` → `{ uploadUrl, key }`; allowlist `image/jpeg` \| `image/png` \| `image/webp`, ≤ 10 MB |
-| PUT / DELETE         | `tanks/:tankId/photo`             | PUT `{ key }` confirms upload; DELETE removes                                                                  |
-| GET / POST           | `tanks/:tankId/water-changes`     |                                                                                                                |
-| PATCH / DELETE       | `tanks/:tankId/water-changes/:id` |                                                                                                                |
-| GET / POST           | `tanks/:tankId/water-tests`       |                                                                                                                |
-| PATCH / DELETE       | `tanks/:tankId/water-tests/:id`   | PATCH replaces `readings` wholesale                                                                            |
-| GET                  | `tanks/:tankId/water-tests/trend` | `?parameter=nitrate` → `[{ at, value }]` ascending                                                             |
+| Method               | Route                             | Notes                                                                                                                                                                                                   |
+| -------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST                 | `auth/register`, `auth/login`     | `{ email, password }` → User; JWT set as an httpOnly cookie (ADR-0006). Register: 201, or 403 once any User exists (checked before the body); login: 200, same 401 for wrong password and unknown email |
+| POST                 | `auth/logout`                     | 204; needs no auth, does not bump `tokenVersion`                                                                                                                                                        |
+| GET / PATCH          | `me`                              | PATCH: `volumeUnit`, `temperatureUnit`; strict (unknown key or empty body → 400)                                                                                                                        |
+| GET                  | `health`                          | `{ status, database }`; 503 if the Mongo connection drops after boot (boot itself waits for Mongo)                                                                                                      |
+| GET / POST           | `tanks`                           | GET returns dashboard summaries (see below)                                                                                                                                                             |
+| GET / PATCH / DELETE | `tanks/:tankId`                   | DELETE cascades; PATCH replaces `fish` / `plants` wholesale                                                                                                                                             |
+| POST                 | `tanks/:tankId/photo`             | `{ contentType, size }` → `{ uploadUrl, key }`; allowlist `image/jpeg` \| `image/png` \| `image/webp`, ≤ 10 MB                                                                                          |
+| PUT / DELETE         | `tanks/:tankId/photo`             | PUT `{ key }` confirms upload; DELETE removes                                                                                                                                                           |
+| GET / POST           | `tanks/:tankId/water-changes`     |                                                                                                                                                                                                         |
+| PATCH / DELETE       | `tanks/:tankId/water-changes/:id` |                                                                                                                                                                                                         |
+| GET / POST           | `tanks/:tankId/water-tests`       |                                                                                                                                                                                                         |
+| PATCH / DELETE       | `tanks/:tankId/water-tests/:id`   | PATCH replaces `readings` wholesale                                                                                                                                                                     |
+| GET                  | `tanks/:tankId/water-tests/trend` | `?parameter=nitrate` → `[{ at, value }]` ascending                                                                                                                                                      |
 
 **Tank summary** (`GET tanks` and `GET tanks/:tankId`): the Tank plus `photoUrl` (presigned GET or null), `lastWaterChangeAt`, `lastWaterTestAt` — the last two from one `findOne` per collection sorted by `at: -1`, or an aggregation when the dashboard has many tanks.
 
-Status codes: 200/201 success, 204 delete, 400 validation, 401 no/invalid token, **404 for any Tank that isn't the caller's**, 409 duplicate email on register.
+Status codes: 200/201 success, 204 delete or logout, 400 validation, 401 no/invalid token, 403 sign-up closed, **404 for any Tank that isn't the caller's**, 409 duplicate email on register (only a first-sign-up race).
 
 ## Algorithms
 
@@ -111,9 +111,9 @@ The API never calls these. The client calls `to*` before submit and `from*` on d
 
 **Auth hardening.** Three rules, no rate limiter:
 
-- `REGISTRATION_OPEN` (env, boolean). `POST auth/register` returns 403 when it is false. It stays true only until the keeper has created their account on each environment, then it is flipped off for good — a closed endpoint beats a throttled one, and this app has exactly one intended User.
-- Password minimum 12 characters, checked in the Zod schema. Length only: no forced symbols or capitals, per current guidance.
-- `node ace user:set-password <email>` for recovery, because `PRD.md` puts password reset out of v1 — without it a forgotten password means editing the database by hand.
+- Sign-up closes automatically: `POST auth/register` returns 403 once any User exists, with no env flag (ADR-0010). Two first sign-ups racing on an empty database could both succeed; accepted.
+- Password 12–256 characters, checked in the Zod schema and counted exactly as sent (the JSON body parser does not trim, ADR-0011). Length only: no forced symbols or capitals, per current guidance.
+- `node ace user:set-password <email>` for recovery, because `PRD.md` puts password reset out of v1 — without it a forgotten password means editing the database by hand. Lives in `app/commands/`: normalise the email (same rule as the API) → look up the User → hidden `New password` and `Confirm password` prompts → mismatch or outside 12–256 → one `updateOne` with `$set` the new hash and `$inc` `tokenVersion` (signs out every device). Every refusal exits 1 and changes nothing. It boots the whole app, so it needs the full env wherever it runs.
 
 No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-memory counter throttles per container rather than globally; a real limit means a Mongo write on every attempt, to guard the one password that can exist once registration is closed. Revisit if the app ever serves more than one keeper.
 
@@ -121,21 +121,22 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 
 **Trend.** `find({ tankId, userId, [`readings.${p}`]: { $exists: true } }, { at, [`readings.${p}`] }).sort({ at: 1 })`. Returns `[{ at, value }]`. Client charts it; temperature converted on the client like any other display.
 
-**Ownership check.** (Middleware arrives with the first child route; until then see Framework wiring.) Route middleware on the `tanks/:tankId` group: `Tank.findOne({ _id: tankId, userId: auth.user.id })` → null → 404 → else `ctx.tank`. Handlers read `ctx.tank`, never re-query by id alone. Child collections are then queried with `{ tankId: ctx.tank.id, userId }` — the second filter is belt-and-braces, cheap because of the index.
+**Ownership check.** (Middleware arrives with the first child route; until then see Framework wiring.) Route middleware on the `tanks/:tankId` group: `Tank.findOne({ _id: tankId, userId: ctx.userId })` → null → 404 → else `ctx.tank`. Handlers read `ctx.tank`, never re-query by id alone. Child collections are then queried with `{ tankId: ctx.tank.id, userId }` — the second filter is belt-and-braces, cheap because of the index.
 
 **Cascade delete.** `deleteMany` on `water_changes` and `water_tests` by `tankId`, `DeleteObject` on `photoKey` if set, then `deleteOne` the Tank. Order: children first so a crash leaves a Tank with no history, not orphans with no Tank.
 
 ## Framework wiring
 
-- AdonisJS 7 `api` starter with Lucid, session and shield removed (ADR-0008). `@adonisjs/auth` returns for the guard contract only (ADR-0003).
+- AdonisJS 7 `api` starter with Lucid, session, shield and `@adonisjs/auth` removed (ADR-0008, ADR-0009). Passwords use the core `hash` provider (scrypt).
 - Mongoose registered as an Adonis provider (`providers/mongo_provider.ts`): one connection opened at boot from `MONGO_URL`, closed on shutdown; models under `app/models/` as Mongoose schemas.
-- JWT guard under `app/auth/guards/jwt.ts` implementing `GuardContract`: reads the `token` cookie, else the `Authorization: Bearer` header (ADR-0006), verifies HS256, then loads the User via `app/auth/user_provider.ts` and rejects if the JWT's `tokenVersion` no longer matches the User's. Registered in `config/auth.ts` as the default guard.
+- Auth is one route middleware, `app/middleware/auth_middleware.ts` (ADR-0009), not a guard: reads the `token` cookie, else the `Authorization: Bearer` header (ADR-0006) — only one is tried — verifies HS256 with `jose`, loads the User and rejects if the JWT's `tokenVersion` no longer matches the User's. Sets `ctx.user` and `ctx.userId`. Token and cookie helpers, `UNAUTHORIZED_BODY` and the cookie attributes (explicit, host-only, `secure` in every environment, raw JWT value) live in `app/services/auth_token.ts`.
 - Validators under `app/validators/` as Zod schemas, one per request shape (ADR-0007); a `ZodError` becomes a 400 in `app/exceptions/handler.ts`; `readings` validator imports `PARAMETERS`.
 - Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group — arrives with the first `tanks/:tankId/*` child route. Until then `TanksController` filters on `{ _id: tankId, userId }` itself. `:tankId` must be 24 hex characters (route matcher), so a malformed id is a 404, not a 500.
 - S3 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` in `app/services/photo_service.ts`. Bucket and region from env.
 - Runs on Lambda via Lambda Web Adapter (ADR-0004): the same Docker image as local, adapter copied into `/opt/extensions/`, readiness check on `/api/v1/health`. The Mongo connection opened at boot is reused across warm invocations.
-- Until the JWT guard lands, `app/middleware/current_user_middleware.ts` sets `ctx.userId` from `DEV_USER_ID` (24 hex characters; boot refuses it in production). The guard replaces it with `ctx.auth.user.id`.
-- Env validated at boot in `start/env.ts` (`MONGO_URL`, `DEV_USER_ID` until the guard lands, `APP_KEY`, `JWT_SECRET`, `PHOTOS_BUCKET`, `AWS_REGION`, `COOKIE_DOMAIN`, …).
+- Body parsing is JSON only (`config/bodyparser.ts`): no form or multipart parser, which makes true the JSON-only half of ADR-0006's CSRF defence (ADR-0011). String trimming is off, so each Zod schema trims its own fields (email, Tank name).
+- Commands under `app/commands/`, found automatically by ace and imported from tests through the `#commands/*` alias. Shared test helpers (cookie helpers, token signing, the expected 401 body) in `app/tests/helpers/auth.ts`.
+- Env validated at boot in `start/env.ts` (`MONGO_URL`, `APP_KEY`, `JWT_SECRET` — at least 32 characters, boot refuses without it — `PHOTOS_BUCKET`, `AWS_REGION`, …).
 - Tests: Japa. Unit for conversion and readings validation; functional (HTTP) against a Testcontainers Mongo, one container per test run, database dropped between suites. S3 calls stubbed in tests (presigner is pure — no network).
 - `web/`: Vite + React + TypeScript, `vite-plugin-pwa`, Tailwind v4 via `@tailwindcss/vite` (CSS-first config, no `tailwind.config.js`), shadcn/ui components as editable source under `web/src/components/ui/` (ADR-0005), `react-router` for the screens below, TanStack Query for server state, Recharts for trends, the shared conversion module and `PARAMETERS` imported (or copied until a shared package exists).
 

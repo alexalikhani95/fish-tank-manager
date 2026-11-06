@@ -23,7 +23,7 @@ A new feature touches `PRD.md` (what), `hld.md`/`lld.md` (how), and a Phase here
 - **Frontend**: React + TypeScript (Vite), **mobile-first PWA** via `vite-plugin-pwa`. No app store. Styling: Tailwind v4 + **shadcn/ui** where a component earns its place — ADR-0005. Routing: `react-router`. Server state: TanStack Query over a thin `fetch` wrapper. Charts: Recharts. Escalation path if ever needed: Capacitor → React Native (Stretch); the API is plain REST so neither touches the backend.
 - **Backend**: Node.js + TypeScript — **AdonisJS 7** (`api` starter stripped, no Lucid) — ADR-0003, ADR-0008
 - **DB**: **MongoDB only** via Mongoose (Atlas free M0). No relational database — ADR-0002
-- **Auth**: custom JWT guard for `@adonisjs/auth` backed by Mongoose — ADR-0003; token in an httpOnly cookie, bearer fallback — ADR-0006
+- **Auth**: one JWT route middleware over Mongoose, no `@adonisjs/auth` guard — ADR-0009; token in an httpOnly cookie, bearer fallback — ADR-0006
 - **Photos**: S3, presigned upload and read URLs
 - **Compute**: **AWS Lambda** — the API's Docker image via Lambda Web Adapter, behind CloudFront, always on at no cost — ADR-0004
 - **Infra**: AWS (Lambda, ECR, S3, CloudFront, Parameter Store) + MongoDB Atlas — Terraform
@@ -42,7 +42,7 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 **Goal: a working app, properly tested, installed on the keeper's phone and in daily use for their own tanks.**
 
 - [~] Scaffold: `app/` done — AdonisJS **7** (`api` starter with Lucid, auth, session and shield stripped — ADR-0008), Mongoose provider, root npm workspaces, `AGENTS.md` → Commands filled in. `web/` (Vite React PWA) still to do
-- [ ] Auth: register / login / logout / `GET /me`, custom JWT guard over Mongoose (ADR-0003), 30-day tokens in an httpOnly `SameSite=Lax` cookie with bearer fallback and a `tokenVersion` revocation check (ADR-0006), password hashed with Adonis `hash` (min 12 chars), `REGISTRATION_OPEN` closing signup once the keeper's account exists, `user:set-password` ace command for recovery; `PATCH /me` for `volumeUnit` and `temperatureUnit`
+- [x] Auth: register / login / logout / `GET /me`, one JWT route middleware over Mongoose (ADR-0009), 30-day tokens in an httpOnly `SameSite=Lax` cookie with bearer fallback and a `tokenVersion` revocation check (ADR-0006), password hashed with Adonis `hash` (12–256 chars), sign-up closing automatically once a User exists (ADR-0010), JSON-only untrimmed bodies (ADR-0011), `user:set-password` ace command for recovery; `PATCH /me` for `volumeUnit` and `temperatureUnit`
 - [ ] Tanks CRUD — `Tank` with embedded `fish[]` and `plants[]`; every query scoped by `userId`; foreign tank → 404; delete cascades WaterChanges, WaterTests, and the S3 object
 - [ ] Photo — client re-encodes the picked image to JPEG at max 1600px before upload (see `lld.md` → Photo pipeline); `POST /tanks/:tankId/photo` returns a presigned PUT; confirm stores the key; tank responses carry a short-lived presigned GET. Allowlist `image/jpeg`, `image/png`, `image/webp`; 10 MB on the picked file
 - [ ] Water changes — create / edit / delete; list per tank newest first; tank summary exposes `lastWaterChangeAt` (derived)
@@ -74,6 +74,7 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 - [ ] Deploy pipeline (see below)
 - [ ] Pino structured logging with request IDs; CloudWatch metrics; Sentry
 - [ ] Secrets via SSM Parameter Store `SecureString` (`MONGO_URL`, `APP_KEY`, JWT secret)
+- [ ] Auth follow-ups: `JWT_SECRET` (at least 32 characters) must be in each environment's secrets before deploy, or the app won't boot. Decide where the keeper runs `user:set-password` — Lambda has no server shell (ADR-0004) and the command needs the full env, so likely a checkout pointed at the environment's `MONGO_URL`
 - [ ] E2E browser tests (Playwright) — a handful of critical flows only (sign up → create tank → log change → log test → see trend). Run on PR against a local API + Testcontainers Mongo; later reused as the post-deploy smoke test against staging
 
 ### Deploy pipeline
