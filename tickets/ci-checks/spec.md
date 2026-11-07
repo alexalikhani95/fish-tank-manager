@@ -68,3 +68,7 @@ Pin only the runner to `ubuntu-22.04`, retaining `mongo:8` and every check. This
 ### Portable locked dependencies
 
 The subsequent application-runner failure requires a narrow lockfile repair: preserve every existing package version and add missing optional platform records for the already locked SWC version. No Linux dependency belongs in the application manifest. Diagnosis, regression seam and remaining execution boundary are in [ticket Comments](issues/01-required-ci-checks.md) and [status](../../docs/status.md).
+
+### Fail-closed application validation
+
+A successful runner exit is insufficient when Ace swallows assembler import errors. CI must directly import assembler in the application context, preserve import/runner failures, and reject output without a positive passed-test count. Extend the locked optional-platform repair to ast-grep at its existing version; keep NODE_ENV=test. Scope is CI wiring and lock metadata, not application behavior. Evidence and remote boundary: [diagnosis](checks/assembler-portability.md), [status](../../docs/status.md).
