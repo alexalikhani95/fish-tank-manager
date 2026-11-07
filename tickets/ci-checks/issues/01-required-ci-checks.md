@@ -12,15 +12,15 @@ Make every pull request to main run the existing formatting, lint, typecheck, ap
 
 ## Acceptance criteria
 
-- [ ] One Ubuntu job named `CI checks` runs on every PR to main, without path filters, and supports manual runs. Use ordinary pull-request events, read-only repository permissions, a finite timeout, and cancellation scoped so unrelated runs are unaffected.
-- [ ] Install locked dependencies with npm ci on Node 24. Start MongoDB 8 with a readiness check and use only the test database. Supply required boot variables with disposable nonsecret values; no developer environment file or production credentials are needed.
-- [ ] Run the existing format check, lint, typecheck and application tests in that order. Run both existing doc gates (the status-claims check and Node script tests), even after an earlier validation failure if setup succeeded and the run was not cancelled. Any validation failure fails the job.
-- [ ] Keep existing checks intact. Any existing formatting cleanup is a separate commit; report substantive pre-existing failures instead of disabling checks or silently expanding scope.
-- [ ] Run all six existing checks locally on a supported Node runtime. Record commands, outcomes and any environmental limitation in Comments.
+- [x] One Ubuntu job named `CI checks` runs on every PR to main, without path filters, and supports manual runs. Use ordinary pull-request events, read-only repository permissions, a finite timeout, and cancellation scoped so unrelated runs are unaffected.
+- [x] Install locked dependencies with npm ci on Node 24. Start MongoDB 8 with a readiness check and use only the test database. Supply required boot variables with disposable nonsecret values; no developer environment file or production credentials are needed.
+- [x] Run the existing format check, lint, typecheck and application tests in that order. Run both existing doc gates (the status-claims check and Node script tests), even after an earlier validation failure if setup succeeded and the run was not cancelled. Any validation failure fails the job.
+- [x] Keep existing checks intact. Any existing formatting cleanup is a separate commit; report substantive pre-existing failures instead of disabling checks or silently expanding scope.
+- [x] Run all six existing checks locally on a supported Node runtime. Record commands, outcomes and any environmental limitation in Comments.
 - [ ] Obtain a real PR run on GitHub and inspect all gate steps. Confirm the emitted job name, docs-only coverage and failure propagation. Any temporary failure probe stays on the feature branch, is removed, and is followed by a green run before merge approval.
 - [ ] After the job has appeared on GitHub, require it for main and require pull requests, enforcing the requirement for ordinary administrator merges. Preserve existing protection settings and do not introduce mandatory human reviews. Read back settings and the PR's required-check state. Record permission failures without claiming protection is complete.
 - [ ] Update the plan and sole status document accurately; reference run and protection evidence in Comments rather than duplicating environment-state claims elsewhere. No product/design changes are expected.
-- [ ] Keep workflow/infra edits in their own commit, separate from documentation changes. Commit deliberately on this feature branch; never merge without the user's final approval.
+- [x] Keep workflow/infra edits in their own commit, separate from documentation changes. Commit deliberately on this feature branch; never merge without the user's final approval.
 
 ## Execution and handoff
 
@@ -31,3 +31,41 @@ The workflow's manual trigger may not be available until the workflow is on the 
 ## Comments
 
 - Spec approved by the user: "okay looks good". Ticket approval pending.
+
+### Local implementation handoff — 2026-11-07
+
+Local implementation and validation complete; ticket remains `ready-for-agent` pending the remote acceptance criteria. CI commit: `3d3eed0c09e0f6ecf0b0646f6d6ad51c62d0e62a` (`ci: run required checks on pull requests`). Documentation is committed separately. Parent-owned `log.md` build line was preserved and left unstaged. No `built` line or Discovered section was added.
+
+Changes: `.github/workflows/ci.yml` wraps the existing six commands with one `CI checks` Ubuntu job, Node 24, MongoDB 8 health checking, disposable boot values, read-only repository permission, a 15-minute timeout, and event/PR-or-ref concurrency. Both doc gates use `!cancelled()` and successful dependency installation as their condition, so earlier validation failures cannot skip them and a failing doc gate cannot skip the other. Plan items remain partial and `docs/status.md` records the verification boundary. Application code, dependencies, test behavior and check commands are unchanged. Baseline `npm run format:check` passed; no separate formatting cleanup commit was needed.
+
+Validation runtime: installed `$HOME/.nvm/versions/node/v24.11.1/bin` prepended to PATH (`node -v`: `v24.11.1`). `npm ci` exited 0: `added 484 packages, and audited 486 packages in 8s`; `22 moderate severity vulnerabilities`. No dependency audit fixes were attempted (outside scope).
+
+Docker's `docker ps` did not return. To avoid all developer data, downloaded the MongoDB 8.0.16 macOS ARM64 archive from `fastdl.mongodb.org` and started its `mongod` with a new temporary data directory, bound only to `127.0.0.1:27028`. The archive directory contains a double hyphen (`mongodb-macos-aarch64--8.0.16`); the initial guessed binary path failed with exit 127, directory inspection corrected it, and startup then reported `child process started successfully, parent exiting`. No application or database fix was needed.
+
+Application test environment matched the workflow's disposable values below, with only the Mongo port changed for isolation; no `app/.env` was created or read:
+
+```sh
+export PATH="$HOME/.nvm/versions/node/v24.11.1/bin:$PATH"
+export NODE_ENV=test TZ=UTC PORT=3333 HOST=127.0.0.1 LOG_LEVEL=silent
+export APP_KEY=ci-only-disposable-app-key-32-chars
+export APP_URL=http://127.0.0.1:3333
+export JWT_SECRET=ci-only-disposable-jwt-secret-at-least-32-chars
+export MONGO_URL=mongodb://127.0.0.1:27028/fishtank_test
+```
+
+All six existing checks exited 0:
+
+| Command                               | Exact result/output excerpt                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `npm run format:check`                | `Checking formatting...` / `All matched files use Prettier code style!`                                             |
+| `npm run lint`                        | `> app@0.0.0 lint` / `> eslint .` (no diagnostics)                                                                  |
+| `npm run typecheck`                   | `> app@0.0.0 typecheck` / `> tsc --noEmit` (no diagnostics)                                                         |
+| `npm test`                            | `PASSED` / `Tests  56 passed (56)` / `Time  2s`                                                                     |
+| `bash scripts/check-status-claims.sh` | `check-status-claims: ok — docs/status.md is the only status surface`                                               |
+| `node --test 'scripts/**/*.test.mjs'` | `ℹ tests 14` / `ℹ pass 14` / `ℹ fail 0` / `ℹ cancelled 0` / `ℹ skipped 0` / `ℹ todo 0` / `ℹ duration_ms 662.199416` |
+
+Additional validation: temporary install of `actionlint` v1.7.7, then `actionlint .github/workflows/ci.yml`: exit 0, no diagnostics. `git diff --check`: exit 0. Formatting and status claims rechecked after documentation edits. An exploratory format check with `--ignore-path /dev/null` flagged four ignored generated `app/.adonisjs/` files; these are deliberately excluded by the existing `.prettierignore` and were left untouched.
+
+Local review applied the code-review skill's Standards and Spec axes directly, without subagents per dispatch instructions: no local implementation findings. The skill's independent parallel review remains for the parent. Readiness command, trigger coverage, stable job name, nonprivileged event, permissions, concurrency separation, setup guard and failure conditions inspected. This static review does not prove GitHub runner execution or merge enforcement.
+
+Remaining work for parent: independent risky-ticket review; push authorized feature branch and open/link a draft PR; inspect the real GitHub run, including both doc gates and failure propagation; obtain a final green run; read current main protection, preserve existing settings, require `CI checks` and PRs with administrator enforcement but no new human-review requirement; read back protection and required-check state, recording any permission limitation. Update the remaining checkboxes, status evidence and log only when those steps are complete. No PR opened, no push, no branch-protection API calls, and no merge in this dispatch. No new application tests or generic workflow-test framework were added, per spec.
