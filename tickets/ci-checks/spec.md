@@ -58,3 +58,9 @@ None yet.
 ## Stop 2 decisions
 
 The user requested `$develop --resume ci-checks` after reviewing the single ticket. This approves that breakdown and requests implementation now. No additional conditions were added. Merge protection and real GitHub verification remain in scope.
+
+## Discovered — 2026-11-07
+
+The parent-inspected [GitHub run 42412272116](https://github.com/alexalikhani95/fish-tank-manager/actions/runs/42412272116) failed during service startup, before any validation step ran: MongoDB explicitly rejected Linux kernels 6.19 and newer ( [SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912) ). The service container shares the runner kernel, so changing application code or readiness retries would not address this failure. The official [Ubuntu 22.04 manifest](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2204-Readme.md) lists `6.8.0-1070-azure`; the [Ubuntu 24.04 manifest](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2404-Readme.md) lists `7.0.0-1017-azure`, so pinning 24.04 would retain the incompatibility.
+
+Pin only the runner to `ubuntu-22.04`, retaining `mongo:8` and every check. This is a temporary compatibility constraint: revisit when MongoDB supports newer kernels or before runner retirement. The runner label does not freeze its kernel forever. The next GitHub PR run is the regression seam; corrected-run verification remains pending. Current evidence is recorded in [the sole status surface](../../docs/status.md).
