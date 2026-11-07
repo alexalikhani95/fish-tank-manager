@@ -9,3 +9,7 @@ VERDICT tickets blockers=0 total=0 file=tickets/ci-checks/checks/tickets.md
 stop 2 awaiting approval
 stop 2 approved
 resume requested by user; proceed with implementation after saving planning files
+build 01 · gpt-6.1-sol high · n/a
+local implementation complete 01 3d3eed0; remote verification pending
+review 01 · gpt-6.1-sol high · n/a
+VERDICT review-01 blockers=0 total=0 file=tickets/ci-checks/checks/review-01.md
