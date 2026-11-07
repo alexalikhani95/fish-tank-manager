@@ -30,3 +30,14 @@ SWC correction: restore eleven missing exact-version optional platform records o
 2026-11-07 assembler diagnosis: run 42412936751 SUCCESS is a false pass (assembler error, no test summary). Clean Linux-targeted install reproduces missing ast-grep GNU binding; local binding-removal probe reproduces npm test exit 0 versus guarded exit 1. Restore eight exact 0.45.3 platform records, preserving every prior lock record. Add direct import preflight and positive passed-count guard with spawned regression coverage. See checks/assembler-portability.md and sole status surface; parent owns next remote logs and review, no remote pass claimed.
 
 Assembler correction local validation: clean npm ci, direct assembler import, all six gates (56 application tests; 15 script tests), actionlint, diff whitespace and exact-version lock assertions pass. Native Linux test execution and independent review remain pending on the next PR run.
+
+ponytail-review and docs pass · gpt-6.1-sol medium · n/a
+VERDICT ponytail blockers=0 total=0 file=tickets/ci-checks/checks/ponytail.md
+false-pass fix · gpt-6.1-sol high · n/a
+pr review 1 · gpt-6.1-sol high · n/a
+pr review standards · model/token usage not reported · n/a
+pr review spec · model/token usage not reported · n/a
+VERDICT pr-review-1 blockers=0 total=0 file=tickets/ci-checks/checks/pr-review-1.md
+built 01 ff4c3ee6dba2536904241c49bebf3c30ef1d7f78
+remote acceptance: run 42413494112 actual 56 application + 15 script tests; all gates pass; main protection read back
+stop 3 awaiting final documentation CI then merge decision

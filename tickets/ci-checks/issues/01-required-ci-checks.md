@@ -17,9 +17,9 @@ Make every pull request to main run the existing formatting, lint, typecheck, ap
 - [x] Run the existing format check, lint, typecheck and application tests in that order. Run both existing doc gates (the status-claims check and Node script tests), even after an earlier validation failure if setup succeeded and the run was not cancelled. Any validation failure fails the job.
 - [x] Keep existing checks intact. Any existing formatting cleanup is a separate commit; report substantive pre-existing failures instead of disabling checks or silently expanding scope.
 - [x] Run all six existing checks locally on a supported Node runtime. Record commands, outcomes and any environmental limitation in Comments.
-- [ ] Obtain a real PR run on GitHub and inspect all gate steps. Confirm the emitted job name, docs-only coverage and failure propagation. Any temporary failure probe stays on the feature branch, is removed, and is followed by a green run before merge approval.
-- [ ] After the job has appeared on GitHub, require it for main and require pull requests, enforcing the requirement for ordinary administrator merges. Preserve existing protection settings and do not introduce mandatory human reviews. Read back settings and the PR's required-check state. Record permission failures without claiming protection is complete.
-- [ ] Update the plan and sole status document accurately; reference run and protection evidence in Comments rather than duplicating environment-state claims elsewhere. No product/design changes are expected.
+- [x] Obtain a real PR run on GitHub and inspect all gate steps. Confirm the emitted job name, docs-only coverage and failure propagation. Any temporary failure probe stays on the feature branch, is removed, and is followed by a green run before merge approval.
+- [x] After the job has appeared on GitHub, require it for main and require pull requests, enforcing the requirement for ordinary administrator merges. Preserve existing protection settings and do not introduce mandatory human reviews. Read back settings and the PR's required-check state. Record permission failures without claiming protection is complete.
+- [x] Update the plan and sole status document accurately; reference run and protection evidence in Comments rather than duplicating environment-state claims elsewhere. No product/design changes are expected.
 - [x] Keep workflow/infra edits in their own commit, separate from documentation changes. Commit deliberately on this feature branch; never merge without the user's final approval.
 
 ## Execution and handoff
@@ -97,3 +97,9 @@ Restore eight missing optional ast-grep platform records at 0.45.3 from exact re
 Clean npm ci and direct local assembler import pass on Node 24.11.1. Guarded application tests execute **56 passed (56)** against MongoDB 8.0.16 on loopback port 27030 using a fresh `/tmp/fish-ci-assembler-mongo.*` data directory and `fishtank_test`; process stopped afterward, developer data untouched. Remaining validation and exact proof: [assembler-portability.md](../checks/assembler-portability.md). Parent must inspect a new GitHub run's actual application-test summary, then perform independent final review; remote acceptance remains open. No watch, polling, merge, protection writes or subagents in this correction.
 
 Final local gates: format, lint, typecheck, guarded application tests (56 passed), status gate and script tests (15 passed) all exit 0; actionlint and diff whitespace check also exit 0. Registry/assert verification independently confirms every existing lock record unchanged and exactly eight exact-version additions.
+
+### Final remote acceptance — 2026-11-07
+
+Evidence: [run 42413494112](https://github.com/alexalikhani95/fish-tank-manager/actions/runs/42413494112) on ff4c3ee. Logs explicitly contain `Tests 56 passed (56)` and script summary 15 passed / 0 failed; all six gate steps succeeded. Earlier run 42412539330 failed the application step and still ran both doc gates successfully; required-check query reported that failure. No artificial failure probe was needed. Main protection readback requires strict `CI checks` and PRs, enforces admins, and requires zero approvals. `gh pr checks --required` matches the emitted job. No merge or bypass was attempted. Current state has its sole home in docs/status.md.
+
+Final PR review reports 0 blockers and 0 findings. Ticket remains ready-for-agent until the user approves merge; acceptance checkboxes are satisfied. Final evidence-only documentation commit still needs its own CI result.
