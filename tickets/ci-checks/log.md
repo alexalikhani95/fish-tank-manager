@@ -19,3 +19,10 @@ protection API readback completed; GitHub run 42412229351 pending; remote failur
 2026-11-07 startup correction: [run 42412272116](https://github.com/alexalikhani95/fish-tank-manager/actions/runs/42412272116) stopped before validation; MongoDB rejected kernel >=6.19 ([SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912)). Pin runner to ubuntu-22.04 only; mongo:8 and checks unchanged. Official manifests: [22.04 kernel 6.8](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2204-Readme.md), [24.04 kernel 7.0](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2404-Readme.md). Revisit for MongoDB kernel support or runner retirement; next GitHub run is the regression seam, parent-owned. See spec Discovered, ticket Comments and [status](../../docs/status.md).
 
 Startup correction validation: `npm run format:check`, `bash scripts/check-status-claims.sh`, `/tmp/fishtank-ci.N32hHS/actionlint .github/workflows/ci.yml`, and `git diff --check` all exited 0. Application tests, lint and typecheck were not rerun for the runner-only change; remote startup and check execution remain unverified pending the next GitHub run.
+fix runner · gpt-6.1-sol medium · n/a
+review 01b · gpt-6.1-sol high · n/a
+VERDICT review-01b blockers=0 total=0 file=tickets/ci-checks/checks/review-01b.md
+run 42412539330: Mongo startup passed; SWC Linux binding missing; doc gates executed successfully after application test failure
+diagnose and fix SWC install · gpt-6.1-sol medium · n/a
+
+SWC correction: restore eleven missing exact-version optional platform records only; existing lock records unchanged. Portable metadata self-check red (11 missing) then green (0); simulated Linux npm ci binary absent before/present after. All six local checks pass on Node 24.11.1 (56 application and 14 script tests). See checks/swc-portability.md, ticket Comments and docs/status.md. Parent owns next GitHub run and independent final review; no watch or merge.
