@@ -15,7 +15,8 @@ concurrency:
 jobs:
   checks:
     name: CI checks
-    runs-on: ubuntu-latest
+    # shortcut: MongoDB rejects Linux >=6.19; revisit when supported or before runner retirement.
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     services:
       mongo:
