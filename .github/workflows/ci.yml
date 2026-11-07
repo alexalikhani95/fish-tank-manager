@@ -54,7 +54,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Application tests
-        run: npm test
+        run: bash scripts/ci-test.sh
       - name: Check status claims
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bash scripts/check-status-claims.sh
