@@ -32,6 +32,7 @@ No worker, queue, cache, or email service in v1. Stack choices and reasons: `PLA
 - **Exposes:** one REST API at `/api/v1/` (OpenAPI-documented). Nothing else is public.
 - **Consumes:** S3 for photo bytes (the API never proxies them). Nothing inbound.
 - **Frontend ↔ API:** same-origin HTTP with the httpOnly JWT cookie; bearer JWT remains available for native clients (ADR-0006). The API does not know what client is calling; this keeps the PWA → Capacitor → React Native path open without backend changes.
+- **Service worker:** caches the public app shell only, so the installed PWA opens offline; `/api/*` always goes to the network and nothing private is stored or queued (`lld.md` → PWA shell).
 - **Units:** the API stores and returns canonical units only (litres, °C). The client converts to and from the User's preferred unit. The one shared conversion module is the only place that knows 3.785 from 4.546.
 - **Independent of `home-manager`:** same process, different stack in two places (ADR-0002, ADR-0003); separate repo, AWS resources, Atlas cluster, and Terraform state.
 

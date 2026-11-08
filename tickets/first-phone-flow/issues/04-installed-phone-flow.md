@@ -1,6 +1,6 @@
 # 04: Install and verify the built phone app
 
-Status: ready-for-agent
+Status: awaiting-review
 Blocked by: 03
 Label: new design (extends ticket 01 frontend and browser setup)
 Risky: yes — service-worker caching, HTTPS/cookies, shared config and CI.
@@ -12,16 +12,16 @@ Make the completed flow installable and safely usable with intermittent connecti
 
 ## Acceptance criteria
 
-- [ ] Add PWA manifest, suitable code-native icons, standalone display and shell precaching. Do not cache API responses, credentials, writes or persistent private queries. Updates must not reload an in-progress entry without consent.
-- [ ] Exclude `/api/*` from both service-worker and server SPA navigation fallback (S1). Tests distinguish API response/status from a valid deep link returning the shell, including after the worker controls the page. Unavailable API requests must not become successful HTML responses.
-- [ ] After an initial online visit the installed shell opens offline. Loaded in-memory data can remain visibly offline; a cold start without session data shows unavailable/retry, not incorrect login. Offline submissions are disabled; in-page non-password values remain, reconnect never auto-submits, and no draft/password persistence is added.
-- [ ] Provide a local certificate/HTTPS configuration using existing Vite build/preview mechanisms, LAN reachability and same-origin API forwarding. Phone instructions serve the built PWA, not just Vite development mode (S3). Certificate/key files are ignored and local paths configurable. Preserve Secure cookies; no public tunnel, custom server platform or production infrastructure.
-- [ ] Document run/stop commands, certificate trust setup/removal, install/reopen steps for relevant iOS/Android browsers, and required user participation. Do not install global trust or bypass phone certificate checks automatically. Ask phone OS/host specifics only when needed for the manual run.
+- [x] Add PWA manifest, suitable code-native icons, standalone display and shell precaching. Do not cache API responses, credentials, writes or persistent private queries. Updates must not reload an in-progress entry without consent.
+- [x] Exclude `/api/*` from both service-worker and server SPA navigation fallback (S1). Tests distinguish API response/status from a valid deep link returning the shell, including after the worker controls the page. Unavailable API requests must not become successful HTML responses.
+- [x] After an initial online visit the installed shell opens offline. Loaded in-memory data can remain visibly offline; a cold start without session data shows unavailable/retry, not incorrect login. Offline submissions are disabled; in-page non-password values remain, reconnect never auto-submits, and no draft/password persistence is added.
+- [x] Provide a local certificate/HTTPS configuration using existing Vite build/preview mechanisms, LAN reachability and same-origin API forwarding. Phone instructions serve the built PWA, not just Vite development mode (S3). Certificate/key files are ignored and local paths configurable. Preserve Secure cookies; no public tunnel, custom server platform or production infrastructure.
+- [x] Document run/stop commands, certificate trust setup/removal, install/reopen steps for relevant iOS/Android browsers, and required user participation. Do not install global trust or bypass phone certificate checks automatically. Ask phone OS/host specifics only when needed for the manual run.
 - [ ] Verify built frontend/PWA build, nonzero browser checks, API/script tests and frontend lint/typecheck/unit checks in GitHub CI. Keep the API test-count guard, independent doc gates and stable required-check identity intact. Fix native platform lock omissions without broad upgrades.
-- [ ] Browser checks exercise real persisted data and valid Secure-cookie access on localhost, shell/deep links and API exclusions. No browser certificate bypass counts as actual-phone acceptance; use isolated test data and deterministic cleanup.
+- [x] Browser checks exercise real persisted data and valid Secure-cookie access on localhost, shell/deep links and API exclusions. No browser certificate bypass counts as actual-phone acceptance; use isolated test data and deterministic cleanup.
 - [ ] Prepare and run the source-blind naive-user pass for unscripted behavior per develop, with a minimal config identifying the browser-scripted flows. Record actual results and fixes, not a source-derived UX assessment.
 - [ ] Invite the User to verify trusted HTTPS, installation, standalone reopening, login, saved WaterChange and offline no-write behavior on their phone. Record device/browser/results separately from desktop checks. If unavailable, report the exact remaining acceptance item at merge approval; never mark the phone checklist passed by inference.
-- [ ] Update design/run instructions, plan and sole status surface with actual outcomes; reconcile the HLD's stale bearer-only boundary sentence with the accepted cookie ADR. Note deferred features explicitly without creating empty product screens.
+- [x] Update design/run instructions, plan and sole status surface with actual outcomes; reconcile the HLD's stale bearer-only boundary sentence with the accepted cookie ADR. Note deferred features explicitly without creating empty product screens.
 
 ## Execution and handoff
 
@@ -30,3 +30,11 @@ Build and validate automated work before requesting device participation. The ma
 ## Comments
 
 Spec approved: "looks good". Tickets approved by the user: "approve" on 2026-11-08. Implementation pending.
+
+Build 04 (2026-11-08, implementer): automated work done on `feature/installed-phone`, awaiting review. Not ticked, still open:
+
+- **GitHub CI** — workflow step renamed "Browser checks" (job name `CI checks`, count guard and doc gates unchanged); needs a real PR run by the main session.
+- **Naive-user pass** — config prepared at `qa/naive-user/fish-tank-manager/config.json` (built preview on 4173, disposable database, scripted flows listed to skip); the pass itself is main-session work.
+- **Real-phone check** — the User on their iPhone (Safari), Mac on the same Wi-Fi, following `docs/design/lld.md` → Phone access and filling in `tickets/first-phone-flow/checks/phone.md`. Pending; never mark it passed by inference.
+
+Notes: HLD's bearer-only boundary sentence was already reconciled with ADR-0006 in ticket 01 (`ce2f179`); this ticket adds the service-worker boundary line. Trusted HTTPS was checked only with a throwaway self-signed certificate and `curl --cacert` on the Mac; mkcert was not installed and no trust store was changed.

@@ -66,12 +66,13 @@ Run from the repo root (npm workspaces; `app/` is the API, `web/` the PWA).
 
 Frontend commands from the root:
 
-| Command                | Does                                                                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev:web`      | Vite frontend on localhost:5173 with same-origin API proxy                                                                                  |
-| `npm run test:web`     | Focused frontend transport/session tests (Vitest)                                                                                           |
-| `npm run build:web`    | Typecheck and production frontend build                                                                                                     |
-| `npm run test:browser` | Chromium against built frontend and isolated real API/MongoDB; setup in [lld.md](docs/design/lld.md#local-frontend-auth-and-browser-checks) |
+| Command                | Does                                                                                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev:web`      | Vite frontend on localhost:5173 with same-origin API proxy                                                                                                  |
+| `npm run test:web`     | Focused frontend transport/session tests (Vitest)                                                                                                           |
+| `npm run build:web`    | Typecheck and production frontend build                                                                                                                     |
+| `npm run test:browser` | Chromium against built frontend and isolated real API/MongoDB; setup in [lld.md](docs/design/lld.md#local-frontend-auth-and-browser-checks)                 |
+| `npm run phone`        | Build, then serve it over trusted HTTPS on the LAN for the User's phone; certificate setup in [lld.md](docs/design/lld.md#phone-access-trusted-local-https) |
 
 Before claiming work is done: typecheck, lint, and tests all green.
 
