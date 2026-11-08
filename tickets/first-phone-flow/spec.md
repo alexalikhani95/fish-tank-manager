@@ -118,3 +118,14 @@ Also retain reviewer reminders: authenticated child-route validation order, bear
 ## Stop 2 decisions
 
 The user approved the four-ticket breakdown with "approve" on 2026-11-08, with no additional conditions. Build in order: signup/sign-in/sign-out; add/view Tanks; log/read WaterChanges; installed PWA and trusted-phone verification. Retain all approved scope, carried review requirements and the ticket-01 Secure-cookie browser proof. Actual-phone verification requires the User's participation and remains distinct from automated checks.
+
+## Discovered
+
+Ticket 01 (2026-11-08):
+
+- Chromium at browser-facing `http://localhost:4173` transports the existing Secure cookie through Vite preview → loopback API. Keep localhost in the automated harness; this is not trusted LAN HTTPS evidence. Extend this configuration in ticket 04.
+- Reuse `session.request` and pass TanStack's AbortSignal for private queries. Session replacement cancels/removes private queries and rejects responses from earlier login generations, including late 401s. Login 401 is deliberately separate from protected 401; network/5xx/unreadable responses retain auth uncertainty.
+- Browser setup and teardown reset only the exact `fishtank_browser` database. Keep Japa on `fishtank_test` and never use either test database for keeper data. The cleanup helper belongs to the API workspace to reuse its Mongoose dependency.
+- Wait for each destination heading before filling fields in Playwright: React Router navigation can leave the prior form's identically labelled inputs briefly available. Without this synchronization the test fills a departing form, then loses the values.
+- Dependency installation hoists existing API tooling. Restore/preserve the original lock records as well as new frontend resolutions; all 503 prior package records are retained unchanged. Clean-install evidence must still include real Japa counts via `scripts/ci-test.sh`.
+- Built preview already forwards `/api` ahead of SPA fallback. Preserve this in ticket 04 and add the service-worker API exclusion separately. PWA dependencies, Tank links and phone HTTPS are intentionally absent from ticket 01.

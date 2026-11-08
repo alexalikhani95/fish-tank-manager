@@ -154,10 +154,11 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 
 Deep links matter: the installed PWA reopens on the last screen, and a tank is shareable as a URL to yourself.
 
-**Server state (`web/`)** — TanStack Query over a thin `fetch` wrapper (`web/src/lib/api.ts`) that sends `credentials: 'include'` (the JWT cookie, ADR-0006), throws on non-2xx, and clears the Query cache and redirects to `/login` on 401. Dev runs the API behind a Vite proxy so the cookie stays same-origin. Query owns caching and refetching; the wrapper owns transport and auth.
+**Server state (`web/`)** — TanStack Query over a thin `fetch` wrapper (`web/src/session.ts`) that sends `credentials: 'include'` (the JWT cookie, ADR-0006), throws on non-2xx, and cancels/clears private queries on a protected-request 401. `GET me` uses `['me']` to resolve the current User before private screens render; a null User redirects to `/login`. Login 401 stays on the form. Network/server failures show unavailable/retry, never invalid credentials. Confirmed login/logout cancels private queries and replaces the User; failed logout retains the User with unconfirmed feedback. Every request checks its login generation so even a late response that ignores abort cannot affect another login. Query functions must pass their `signal` to `session.request`. Passwords stay only in form memory and clear after a submission; neither credentials nor query data are persisted. Dev runs the API behind a Vite proxy so the cookie stays same-origin. Query owns caching and refetching; the wrapper owns transport and auth.
 
 | Key                                     | Source                               |
 | --------------------------------------- | ------------------------------------ |
+| `['me']`                                | `GET me` — current User or null      |
 | `['tanks']`                             | `GET tanks` — dashboard summaries    |
 | `['tanks', tankId]`                     | `GET tanks/:tankId`                  |
 | `['tanks', tankId, 'water-changes']`    | `GET …/water-changes`                |
@@ -167,6 +168,16 @@ Deep links matter: the installed PWA reopens on the last screen, and a tank is s
 Mutations invalidate the narrowest prefix that covers what changed: logging a water change invalidates `['tanks', tankId, 'water-changes']` and `['tanks']` (the dashboard's `lastWaterChangeAt` is derived on read). Refetch-on-focus is left on — a phone that sleeps mid-log comes back current.
 
 Offline is out of v1 (`PRD.md` → Not in v1): `vite-plugin-pwa` precaches the shell so the app opens without a connection, but writes are not queued — the log forms disable themselves and show a "no connection" banner instead of accepting an entry that would be lost.
+
+### Local frontend auth and browser checks
+
+Use Node 24 and `npm ci` from the root. Root commands are listed in [AGENTS.md](../../AGENTS.md#commands). Start MongoDB and the API with the API's local `.env`; run `npm run dev:web` and open `http://localhost:5173`. Vite forwards `/api` to `http://127.0.0.1:3333`; `API_PROXY_TARGET` overrides that target for development or built preview. Keep the browser-facing hostname `localhost` for Chromium's Secure-cookie loopback behavior. This desktop exception does not provide trusted phone access.
+
+For the built frontend, run `npm run build:web` then `npm run preview --workspace web` (`http://localhost:4173`). Both dev and preview proxy API requests before SPA fallback. Preview has a strict port to avoid silently testing another origin. Ticket 04 extends this same Vite configuration for LAN HTTPS/PWA.
+
+Install Chromium once with `npx playwright install chromium` (CI adds `--with-deps`). `npm run test:browser` requires MongoDB and an existing frontend build, starts/stops its own API on port 3334 and preview on 4173, and rejects occupied ports. It exclusively resets `fishtank_browser` before/after the suite; never use this name for keeper data. `MONGO_BROWSER_URL` can select another Mongo port/host but must retain that exact database name. Japa must use a distinct disposable database (`fishtank_test`). Cleanup lives alongside API test helpers to reuse Mongoose without adding it to the browser bundle. No preexisting API/preview process is reused. For manually started development or preview commands, stop with Ctrl-C; MongoDB lifecycle remains with the caller.
+
+The auth browser flow uses real HTTP/API persistence, Chromium cookie transport and no certificate bypass/bearer injection. Additional error-path checks may intercept failures, never successful auth. Vitest and Playwright reject empty test runs. The `CI checks` job adds frontend lint/typecheck, unit tests, build and browser checks while retaining the API false-pass preflight and failure-independent doc gates.
 
 **Photo pipeline (`web/`)** — the picked file is re-encoded before it is uploaded, never sent as-is:
 

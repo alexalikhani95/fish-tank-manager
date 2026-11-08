@@ -60,9 +60,18 @@ Run from the repo root (npm workspaces; `app/` is the API, `web/` the PWA).
 | `npm run db`        | starts MongoDB for development (`docker compose up -d`) |
 | `npm run dev`       | API on http://localhost:3333 — needs `npm run db` first |
 | `npm test`          | Japa tests against the `fishtank_test` database         |
-| `npm run lint`      | ESLint (Prettier runs inside it)                        |
+| `npm run lint`      | ESLint across API and frontend                          |
 | `npm run format`    | Prettier, writing in place                              |
-| `npm run typecheck` | `tsc --noEmit`                                          |
+| `npm run typecheck` | `tsc --noEmit` across API and frontend                  |
+
+Frontend commands from the root:
+
+| Command                | Does                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev:web`      | Vite frontend on localhost:5173 with same-origin API proxy                                                                                  |
+| `npm run test:web`     | Focused frontend transport/session tests (Vitest)                                                                                           |
+| `npm run build:web`    | Typecheck and production frontend build                                                                                                     |
+| `npm run test:browser` | Chromium against built frontend and isolated real API/MongoDB; setup in [lld.md](docs/design/lld.md#local-frontend-auth-and-browser-checks) |
 
 Before claiming work is done: typecheck, lint, and tests all green.
 
