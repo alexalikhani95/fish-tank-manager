@@ -5,6 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
   QueryClientProvider,
@@ -392,14 +393,16 @@ function AddTank() {
   const [checked, setChecked] = useState(false);
   const feedback = useRef<HTMLDivElement>(null);
   const unit = volumeLabels[user.volumeUnit];
+  // The amount is in the User's volumeUnit; full-precision litres are stored, only display rounds.
+  const amount = Number(volume); // "" is 0, so it fails the same check.
+  const litres = toLitres(amount, user.volumeUnit);
   const mutation = useMutation({
     mutationFn: () =>
       session.request<Tank>("tanks", {
         method: "POST",
         body: JSON.stringify({
           name,
-          // Full precision is stored; only display rounds.
-          volumeLitres: toLitres(Number(volume), user.volumeUnit),
+          volumeLitres: litres,
         }),
       }),
     onSuccess: (tank) => {
@@ -417,9 +420,9 @@ function AddTank() {
   const error = mutation.error;
   const serverErrors =
     error instanceof ApiError && error.status === 400 ? error.errors : [];
-  const litres = Number(volume); // "" is 0, so it fails the same check.
   const nameInvalid = name.trim().length < 1 || name.trim().length > 80;
-  const volumeInvalid = !Number.isFinite(litres) || litres <= 0;
+  // Litres are checked too: a finite amount can still overflow, e.g. 1e308 UK gal.
+  const volumeInvalid = !(amount > 0) || !Number.isFinite(litres);
   const fieldError = (field: string, local: string | false) =>
     (checked && local) ||
     serverErrors
@@ -441,9 +444,13 @@ function AddTank() {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          setChecked(true);
-          if (online && !mutation.isPending && !nameInvalid && !volumeInvalid)
-            mutation.mutate();
+          // Render the errors before focusing, so the field announces its error.
+          flushSync(() => setChecked(true));
+          if (nameInvalid || volumeInvalid)
+            document
+              .getElementById(nameInvalid ? "tank-name" : "tank-volume")
+              ?.focus();
+          else if (online && !mutation.isPending) mutation.mutate();
         }}
         className="space-y-5"
       >
@@ -469,7 +476,6 @@ function AddTank() {
           <Input
             id="tank-name"
             value={name}
-            maxLength={80}
             autoComplete="off"
             onChange={(e) => setName(e.target.value)}
             disabled={mutation.isPending}

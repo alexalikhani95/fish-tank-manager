@@ -1,6 +1,6 @@
 # 02: Add and view Tanks
 
-Status: ready-for-agent
+Status: awaiting-review
 Blocked by: 01
 Label: new design (reuse ticket 01 auth, transport and controls)
 Risky: yes — shared authenticated routes/query state and input conversion.
@@ -26,4 +26,11 @@ Reuse ticket 01 commands and CI; do not introduce another test harness. Unit con
 
 ## Comments
 
-Spec approved: "looks good". Tickets approved by the user: "approve" on 2026-11-08. Implementation pending.
+Spec approved: "looks good". Tickets approved by the user: "approve" on 2026-11-08. Implementation report follows; merge remains pending.
+
+Implementation report — 2026-11-08:
+
+- Status: implemented locally in `e44613c`, reviewed; review findings fixed in a follow-up commit. Awaiting merge; no PR or push.
+- Review fixes: one home for check counts in `docs/status.md`; Add Tank parses the amount once and rejects non-finite litres (e.g. `1e308` UK gal) as a field error; name has no raw length cap, so over 80 characters after trimming is a field error; a failed client-side submit focuses the first invalid field. Browser flow now also checks focus, the over-long name, the overflowing volume and a direct Tank-to-Tank switch that never shows the previous Tank's data.
+- Checks: see `docs/status.md` → Local checks.
+- Deferred to ticket 03: splitting `web/src/main.tsx` and renaming the browser test file.

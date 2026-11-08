@@ -21,3 +21,4 @@ built 01 ce2f179b7e378e1afcdd1b3232460e75b783f279
 build 02 · gpt-6.1-sol high · n/a
 build 02 local: Dashboard, Add Tank and Tank detail on existing Tank API, pure volume conversion/display, browser Tank create/view/reload/deep-link, field errors, unconfirmed create, missing Tank and UK-gallon preference; awaiting parent review, no merge/push
 checks 02: 56 API + 9 frontend + 15 scripts + 2 Chromium; typecheck/lint/build/format/status gates
+review 02 fixes: status check counts in one row; Add Tank amount parsed once with non-finite litres rejected; no raw name cap (trimmed 1–80 field error); focus first invalid field; browser covers Tank-to-Tank switch without stale data, over-long name and 1e308 volume
