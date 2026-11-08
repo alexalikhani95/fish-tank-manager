@@ -4,8 +4,11 @@ import { Buffer } from "node:buffer";
 import { writeFileSync } from "node:fs";
 import { URL } from "node:url";
 import { deflateSync } from "node:zlib";
+import { themeColor } from "../theme.ts";
 
-const background = [0x12, 0x3d, 0x37];
+const background = [1, 3, 5].map((i) =>
+  parseInt(themeColor.slice(i, i + 2), 16),
+);
 const fish = [0xe6, 0xf4, 0xf1];
 
 // Coverage of the fish at (x, y) in 0..1 units. Everything sits inside the

@@ -13,10 +13,12 @@ test("installable shell: manifest, worker-served deep links, API pass-through an
     display: "standalone",
     start_url: "/",
   });
-  expect(manifest.icons.map((icon: { sizes: string }) => icon.sizes)).toEqual([
-    "192x192",
-    "512x512",
-  ]);
+  expect(
+    manifest.icons.map(
+      (icon: { sizes: string; purpose?: string }) =>
+        `${icon.sizes} ${icon.purpose ?? "any"}`,
+    ),
+  ).toEqual(["192x192 any", "512x512 any", "512x512 maskable"]);
   for (const icon of ["icon-192.png", "icon-512.png", "apple-touch-icon.png"]) {
     const response = await page.request.get(`/${icon}`);
     expect(response.headers()["content-type"]).toBe("image/png");
@@ -44,6 +46,7 @@ test("installable shell: manifest, worker-served deep links, API pass-through an
     ["/api/v1/me", 200],
     [`/api/v1/tanks/${"0".repeat(24)}`, 404],
     ["/api/v1/no-such-route", 404],
+    ["/api", 404],
   ] as const) {
     const api = await page.goto(path);
     expect(api?.status(), path).toBe(status);
@@ -100,4 +103,32 @@ test("installable shell: manifest, worker-served deep links, API pass-through an
   await cold.getByRole("button", { name: "Try again" }).click();
   await expect(cold.getByRole("heading", { name: "Shell Tank" })).toBeVisible();
   await cold.close();
+});
+
+test("online with the API unreachable: /api fails, never the shell", async ({
+  page,
+}) => {
+  // The second preview (playwright.config.ts) proxies /api to a closed port.
+  const unreachable = "http://localhost:4174";
+  await page.goto(`${unreachable}/`);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(
+    true,
+  );
+  for (const path of ["/api/v1/me", "/api"]) {
+    const api = await page.goto(`${unreachable}${path}`);
+    expect(api?.fromServiceWorker(), path).toBe(false);
+    expect(api?.ok(), path).toBe(false);
+    expect(api?.headers()["content-type"] ?? "", path).not.toContain(
+      "text/html",
+    );
+  }
+  await page.goto(`${unreachable}/`);
+  expect(
+    await page.evaluate(async () => {
+      const response = await fetch("/api/v1/me");
+      return [response.ok, response.headers.get("content-type") ?? ""];
+    }),
+  ).toEqual([false, expect.not.stringContaining("text/html")]);
 });

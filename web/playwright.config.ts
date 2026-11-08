@@ -48,5 +48,14 @@ export default defineConfig({
       reuseExistingServer: false,
       env: { API_PROXY_TARGET: "http://127.0.0.1:3334" },
     },
+    {
+      // Same build, but its API proxy points at a closed port: the browser is
+      // online and the API is unreachable (pwa.spec.ts).
+      command: "npm run preview -- --port 4174",
+      url: "http://localhost:4174",
+      reuseExistingServer: false,
+      env: { API_PROXY_TARGET: "http://127.0.0.1:9" },
+      stderr: "ignore", // its expected proxy errors
+    },
   ],
 });

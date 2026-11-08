@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { themeColor } from "./theme.ts";
 
 const proxy = {
   "/api": { target: process.env.API_PROXY_TARGET ?? "http://127.0.0.1:3333" },
@@ -25,6 +26,10 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: "theme-color",
+      transformIndexHtml: (html) => html.replace("%THEME_COLOR%", themeColor),
+    },
     VitePWA({
       // A new worker waits until every window of the app is closed: no reload
       // can interrupt an entry. The new version runs on the next cold open.
@@ -37,15 +42,16 @@ export default defineConfig(({ mode }) => ({
         start_url: "/",
         scope: "/",
         display: "standalone",
-        background_color: "#123d37",
-        theme_color: "#123d37",
+        background_color: themeColor,
+        theme_color: themeColor,
         icons: [
           { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png" },
           {
             src: "icon-512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "maskable",
           },
         ],
       },
@@ -53,7 +59,7 @@ export default defineConfig(({ mode }) => ({
         // Precache the public shell only. No runtimeCaching: API responses,
         // credentials and writes always go to the network.
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api(\/|\?|$)/],
       },
     }),
   ],
