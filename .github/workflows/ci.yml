@@ -55,6 +55,18 @@ jobs:
         run: npm run typecheck
       - name: Application tests
         run: bash scripts/ci-test.sh
+      - name: Frontend tests
+        run: npm run test:web
+      - name: Frontend production build
+        env:
+          NODE_ENV: production
+        run: npm run build:web
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser auth smoke
+        env:
+          MONGO_BROWSER_URL: mongodb://127.0.0.1:27017/fishtank_browser
+        run: npm run test:browser
       - name: Check status claims
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bash scripts/check-status-claims.sh

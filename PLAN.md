@@ -41,7 +41,7 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 
 **Goal: a working app, properly tested, installed on the keeper's phone and in daily use for their own tanks.**
 
-- [~] Scaffold: `app/` done — AdonisJS **7** (`api` starter with Lucid, auth, session and shield stripped — ADR-0008), Mongoose provider, root npm workspaces, `AGENTS.md` → Commands filled in. `web/` (Vite React PWA) still to do
+- [~] Scaffold: `app/` done — AdonisJS **7** (`api` starter with Lucid, auth, session and shield stripped — ADR-0008), Mongoose provider, root npm workspaces, `AGENTS.md` → Commands filled in. `web/` auth shell in the first-phone-flow ticket 01; PWA installation remains ticket 04 (verification: `docs/status.md`)
 - [x] Auth: register / login / logout / `GET /me`, one JWT route middleware over Mongoose (ADR-0009), 30-day tokens in an httpOnly `SameSite=Lax` cookie with bearer fallback and a `tokenVersion` revocation check (ADR-0006), password hashed with Adonis `hash` (12–256 chars), sign-up closing automatically once a User exists (ADR-0010), JSON-only untrimmed bodies (ADR-0011), `user:set-password` ace command for recovery; `PATCH /me` for `volumeUnit` and `temperatureUnit`
 - [ ] Tanks CRUD — `Tank` with embedded `fish[]` and `plants[]`; every query scoped by `userId`; foreign tank → 404; delete cascades WaterChanges, WaterTests, and the S3 object
 - [ ] Photo — client re-encodes the picked image to JPEG at max 1600px before upload (see `lld.md` → Photo pipeline); `POST /tanks/:tankId/photo` returns a presigned PUT; confirm stores the key; tank responses carry a short-lived presigned GET. Allowlist `image/jpeg`, `image/png`, `image/webp`; 10 MB on the picked file
@@ -75,7 +75,7 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 - [ ] Pino structured logging with request IDs; CloudWatch metrics; Sentry
 - [ ] Secrets via SSM Parameter Store `SecureString` (`MONGO_URL`, `APP_KEY`, JWT secret)
 - [ ] Auth follow-ups: `JWT_SECRET` (at least 32 characters) must be in each environment's secrets before deploy, or the app won't boot. Decide where the keeper runs `user:set-password` — Lambda has no server shell (ADR-0004) and the command needs the full env, so likely a checkout pointed at the environment's `MONGO_URL`
-- [ ] E2E browser tests (Playwright) — a handful of critical flows only (sign up → create tank → log change → log test → see trend). Run on PR against a local API + Testcontainers Mongo; later reused as the post-deploy smoke test against staging
+- [ ] E2E browser tests (Playwright) — a handful of critical flows only (sign up → create tank → log change → log test → see trend). Auth smoke comes forward into Phase 1 in `tickets/first-phone-flow/issues/01-sign-in.md`, extended by later slice tickets. Remaining flows run on PR against a local API + Testcontainers Mongo; later reused as the post-deploy smoke test against staging
 
 ### Deploy pipeline
 
