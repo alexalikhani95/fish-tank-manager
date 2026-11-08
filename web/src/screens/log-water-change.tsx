@@ -45,7 +45,7 @@ function WaterChangeForm({ tankId, name }: { tankId: string; name: string }) {
         }),
       }),
     onSuccess: async () => {
-      // Refetch this Tank's history and summary and the dashboard before
+      // Refetch this Tank's log and summary and the dashboard before
       // showing them, so the new entry is there on arrival.
       await Promise.all([
         session.client.invalidateQueries({
@@ -116,8 +116,8 @@ function WaterChangeForm({ tankId, name }: { tankId: string; name: string }) {
               <>
                 Your water change was not confirmed as saved. It may or may not
                 have been recorded. Before trying again,{" "}
-                <Link to={`/tanks/${tankId}`}>check the history</Link> so it
-                isn’t logged twice.
+                <Link to={`/tanks/${tankId}`}>check the log</Link> so it isn’t
+                logged twice.
               </>
             )}
           </div>
@@ -155,12 +155,6 @@ function WaterChangeForm({ tankId, name }: { tankId: string; name: string }) {
         >
           {mutation.isPending ? "Saving…" : "Save water change"}
         </Button>
-        {!online && (
-          <p className="text-sm text-muted-foreground">
-            Saving needs a connection. Your entry stays here until you’re back
-            online.
-          </p>
-        )}
       </form>
     </section>
   );

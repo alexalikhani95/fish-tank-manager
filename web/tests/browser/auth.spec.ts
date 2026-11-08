@@ -120,7 +120,7 @@ test("empty install: signup → Tank → logout → login → WaterChange → re
   await page.getByRole("link", { name: /^River Tank/ }).click();
   await expect(page).toHaveURL(tankUrl);
   await expect(page.getByRole("heading", { name: "River Tank" })).toBeVisible();
-  // Log a WaterChange after signing back in: real POST, history and summaries.
+  // Log a WaterChange after signing back in: real POST, log and summaries.
   await page.getByRole("link", { name: "Log water change" }).click();
   await expect(
     page.getByRole("heading", { name: "Log water change" }),
@@ -139,14 +139,14 @@ test("empty install: signup → Tank → logout → login → WaterChange → re
   expect((await save).status()).toBe(201);
   await expect(page).toHaveURL(tankUrl);
   await expect(page.getByRole("status")).toContainText("Water change saved.");
-  const history = page.getByRole("list", { name: "Water change history" });
-  await expect(history.getByRole("listitem")).toHaveCount(1);
-  await expect(history).toContainText("1 Nov 2026");
-  await expect(history).toContainText("25% replaced");
-  await expect(history).toContainText("Cleaned the filter");
+  const log = page.getByRole("list", { name: "Water change log" });
+  await expect(log.getByRole("listitem")).toHaveCount(1);
+  await expect(log).toContainText("1 Nov 2026");
+  await expect(log).toContainText("25% replaced");
+  await expect(log).toContainText("Cleaned the filter");
   await expect(page.getByText("None yet")).toHaveCount(0);
   await page.reload();
-  await expect(history).toContainText("25% replaced");
+  await expect(log).toContainText("25% replaced");
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await expect(page.getByRole("link", { name: /^River Tank/ })).toContainText(
     "Last water change: 1 Nov 2026",

@@ -74,7 +74,7 @@ test.group('WaterChanges', (group) => {
     assert.notProperty(response.body(), 'litres')
   })
 
-  test('an empty history is an empty array', async ({ client }) => {
+  test('an empty log is an empty array', async ({ client }) => {
     const response = await client.get(url()).header('cookie', cookie)
 
     response.assertStatus(200)

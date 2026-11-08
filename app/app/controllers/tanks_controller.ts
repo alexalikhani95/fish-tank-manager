@@ -14,7 +14,7 @@ export default class TanksController {
   async index({ userId }: HttpContext) {
     const tanks = await Tank.find({ userId }).sort({ createdAt: -1, _id: -1 })
     const latest = await WaterChange.aggregate<{ _id: unknown; at: string }>([
-      { $match: { userId } },
+      { $match: { userId, tankId: { $in: tanks.map((tank) => tank._id) } } },
       { $group: { _id: '$tankId', at: { $max: '$at' } } },
     ])
     const latestByTank = new Map(latest.map((row) => [String(row._id), row.at]))
@@ -50,7 +50,7 @@ export default class TanksController {
 
   /**
    * DELETE /api/v1/tanks/:tankId — children first, no transaction, so a failure
-   * part-way leaves a Tank without history, never history without a Tank
+   * part-way leaves a Tank with an empty log, never WaterChanges without a Tank
    * (docs/design/lld.md → Cascade delete). Errors propagate as a 500.
    */
   async destroy({ response, tank, userId }: HttpContext) {

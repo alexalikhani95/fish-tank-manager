@@ -53,29 +53,26 @@ function TankDetail({ tankId }: { tankId: string }) {
         </Link>
       </p>
       <h2 className="mb-2 text-xl font-semibold">Water changes</h2>
-      <History tankId={tankId} />
+      <WaterChangeLog tankId={tankId} />
     </section>
   );
 }
 
-function History({ tankId }: { tankId: string }) {
-  const history = useQuery({
+function WaterChangeLog({ tankId }: { tankId: string }) {
+  const log = useQuery({
     queryKey: ["tanks", tankId, "water-changes"],
     queryFn: ({ signal }) =>
       session.request<WaterChange[]>(`tanks/${tankId}/water-changes`, {
         signal,
       }),
   });
-  if (!history.data) {
-    if (history.isPending) return <p role="status">Loading water changes…</p>;
+  if (!log.data) {
+    if (log.isPending) return <p role="status">Loading water changes…</p>;
     return (
-      <Unavailable
-        what="the water changes"
-        retry={() => void history.refetch()}
-      />
+      <Unavailable what="the water changes" retry={() => void log.refetch()} />
     );
   }
-  if (history.data.length === 0) {
+  if (log.data.length === 0) {
     return (
       <div className="rounded-md bg-muted p-4">
         <p className="font-semibold">No water changes yet.</p>
@@ -84,8 +81,8 @@ function History({ tankId }: { tankId: string }) {
     );
   }
   return (
-    <ul aria-label="Water change history" className="space-y-3">
-      {history.data.map((change) => (
+    <ul aria-label="Water change log" className="space-y-3">
+      {log.data.map((change) => (
         <li
           key={change._id}
           className="rounded-md border border-input bg-white p-4"

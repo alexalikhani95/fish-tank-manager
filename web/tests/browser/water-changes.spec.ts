@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createTank, signIn } from "./helpers";
 
-test("WaterChange form: field errors, offline-disabled save, unconfirmed save, same-day order and separate histories", async ({
+test("WaterChange form: field errors, offline-disabled save, unconfirmed save, same-day order and separate logs", async ({
   page,
   context,
 }) => {
@@ -54,12 +54,15 @@ test("WaterChange form: field errors, offline-disabled save, unconfirmed save, s
   );
   expect(posts).toBe(1);
 
-  // Offline: save disabled, values kept, nothing replayed on reconnect.
+  // Offline: the Shell's announced banner, save disabled, values kept, nothing
+  // replayed on reconnect.
   await date.fill("2026-11-02");
   await note.fill("  Offline note  ");
   await context.setOffline(true);
   await expect(save).toBeDisabled();
-  await expect(page.getByText("Saving needs a connection")).toBeVisible();
+  await expect(page.getByRole("status")).toContainText(
+    "You’re offline. Connect before trying again.",
+  );
   await expect(date).toHaveValue("2026-11-02");
   await expect(percent).toHaveValue("30");
   await expect(note).toHaveValue("  Offline note  ");
@@ -81,7 +84,7 @@ test("WaterChange form: field errors, offline-disabled save, unconfirmed save, s
   await expect(percent).toHaveValue("30");
   await expect(note).toHaveValue("  Offline note  ");
   await page.unroute("**/api/v1/tanks/*/water-changes");
-  await page.getByRole("link", { name: "check the history" }).click();
+  await page.getByRole("link", { name: "check the log" }).click();
   await expect(page.getByRole("heading", { name: "Pond Tank" })).toBeVisible();
   await expect(page.getByText("No water changes yet.")).toBeVisible();
   expect(posts).toBe(2);
@@ -97,7 +100,7 @@ test("WaterChange form: field errors, offline-disabled save, unconfirmed save, s
     await save.click();
     await expect(page.getByRole("status")).toContainText("Water change saved.");
   }
-  const entries = page.getByRole("list", { name: "Water change history" });
+  const entries = page.getByRole("list", { name: "Water change log" });
   await expect(entries.getByRole("listitem")).toHaveText([
     /2 Nov 2026.*10% replaced/,
     /2 Nov 2026.*30% replaced/,
@@ -106,7 +109,7 @@ test("WaterChange form: field errors, offline-disabled save, unconfirmed save, s
     page.getByText("2 Nov 2026", { exact: true }).first(),
   ).toBeVisible();
 
-  // Switching Tanks never shows the other Tank's history, even for a frame.
+  // Switching Tanks never shows the other Tank's log, even for a frame.
   const shrimpPath = `/tanks/${shrimpId}`;
   await page.evaluate((shrimpPath) => {
     const w = window as unknown as { leaked: string[] };
