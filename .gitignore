@@ -2,3 +2,6 @@
 .claude/settings.local.json
 node_modules/
 .env
+web/dist/
+web/test-results/
+web/playwright-report/
