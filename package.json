@@ -5,16 +5,21 @@
   "type": "module",
   "license": "UNLICENSED",
   "workspaces": [
-    "app"
+    "app",
+    "web"
   ],
   "scripts": {
     "dev": "npm run dev --workspace app",
     "test": "npm run test --workspace app",
-    "lint": "npm run lint --workspace app",
+    "lint": "npm run lint --workspaces",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspace app",
+    "typecheck": "npm run typecheck --workspaces",
     "db": "docker compose up -d",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "dev:web": "npm run dev --workspace web",
+    "test:web": "npm test --workspace web",
+    "build:web": "npm run build --workspace web",
+    "test:browser": "npm run test:browser --workspace web"
   },
   "devDependencies": {
     "prettier": "^3.9.9"

@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@theme {
+  --color-background: #f5f7f3;
+  --color-foreground: #193c36;
+  --color-primary: #176b5b;
+  --color-primary-foreground: #ffffff;
+  --color-input: #aabcb3;
+  --color-ring: #176b5b;
+  --color-destructive: #a42727;
+  --color-muted: #e9efeb;
+  --color-muted-foreground: #52675e;
+  --color-accent: #e0ebe4;
+  --color-accent-foreground: #193c36;
+  --color-secondary: #e0ebe4;
+  --color-secondary-foreground: #193c36;
+  --radius-md: 0.65rem;
+}
+@layer base {
+  body {
+    @apply m-0 bg-background text-foreground antialiased;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  button,
+  input {
+    font: inherit;
+  }
+  a {
+    @apply inline-flex min-h-11 items-center underline underline-offset-4;
+  }
+  a:focus-visible {
+    @apply rounded outline-2 outline-offset-4 outline-ring;
+  }
+}
