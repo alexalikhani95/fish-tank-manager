@@ -12,13 +12,13 @@ Turn the authenticated landing page into a useful Tank dashboard. Let the User c
 
 ## Acceptance criteria
 
-- [ ] Dashboard, Add Tank and Tank detail routes use existing `_id` response shapes and ownership-scoped endpoints. Show loading, unavailable/retry, empty and missing-Tank states without confusing network failures with authentication failures.
-- [ ] Empty dashboard offers Add Tank. Create takes name and positive finite volume with clear field errors, disables duplicate submission, preserves entered values after failure and navigates to the created Tank after success. Display names/notes as text.
-- [ ] Implement only needed pure volume conversions using exact spec factors for litres, US gallons and UK gallons. Read the User's existing preference, retain precision on submission and round only display. Tests distinguish both gallons and check known values/round trips.
-- [ ] Dashboard cards/detail show name and preferred-unit volume. `lastWaterChangeAt` is introduced in ticket 03; until then show the neutral no-changes state rather than inventing history. Ticket 03 adds log links/history and invalidation.
-- [ ] Honour ticket 01 session/cache boundaries. Switching Tanks must not flash another Tank's data. Narrow-screen/keyboard accessibility remains intact.
-- [ ] Extend the real browser flow to create/view a Tank and confirm persistence after reload. Test a non-litre preference prepared through the existing API, without adding settings UI. Existing auth and Tank tests remain green.
-- [ ] Update design/status for the delivered scope. No Tank edit/delete UI, livestock, photos or settings.
+- [x] Dashboard, Add Tank and Tank detail routes use existing `_id` response shapes and ownership-scoped endpoints. Show loading, unavailable/retry, empty and missing-Tank states without confusing network failures with authentication failures.
+- [x] Empty dashboard offers Add Tank. Create takes name and positive finite volume with clear field errors, disables duplicate submission, preserves entered values after failure and navigates to the created Tank after success. Display names/notes as text.
+- [x] Implement only needed pure volume conversions using exact spec factors for litres, US gallons and UK gallons. Read the User's existing preference, retain precision on submission and round only display. Tests distinguish both gallons and check known values/round trips.
+- [x] Dashboard cards/detail show name and preferred-unit volume. `lastWaterChangeAt` is introduced in ticket 03; until then show the neutral no-changes state rather than inventing history. Ticket 03 adds log links/history and invalidation.
+- [x] Honour ticket 01 session/cache boundaries. Switching Tanks must not flash another Tank's data. Narrow-screen/keyboard accessibility remains intact.
+- [x] Extend the real browser flow to create/view a Tank and confirm persistence after reload. Test a non-litre preference prepared through the existing API, without adding settings UI. Existing auth and Tank tests remain green.
+- [x] Update design/status for the delivered scope. No Tank edit/delete UI, livestock, photos or settings.
 
 ## Boundaries and verification
 

@@ -107,7 +107,7 @@ toLitres(value, unit)   / fromLitres(litres, unit)
 toCelsius(value, unit)  / fromCelsius(c, unit)      # F = C × 9/5 + 32
 ```
 
-The API never calls these. The client calls `to*` before submit and `from*` on display; display rounds (litres 0 dp, gallons 0 dp, °F 1 dp).
+The API never calls these. The client calls `to*` before submit and `from*` on display; display rounds (litres 0 dp, gallons 0 dp, °F 1 dp). Volume conversion lives in `web/src/volume.ts` (`toLitres`, `fromLitres`, `formatVolume`) until a second consumer needs a shared package; temperature arrives with WaterTests.
 
 **Auth hardening.** Three rules, no rate limiter:
 
@@ -164,6 +164,8 @@ Deep links matter: the installed PWA reopens on the last screen, and a tank is s
 | `['tanks', tankId, 'water-changes']`    | `GET …/water-changes`                |
 | `['tanks', tankId, 'water-tests']`      | `GET …/water-tests`                  |
 | `['tanks', tankId, 'trend', parameter]` | `GET …/water-tests/trend?parameter=` |
+
+**Tank screens.** The authenticated routes share one layout (Dashboard link, sign-out, User email) and read the current User's `volumeUnit` for labels and display. Dashboard (`['tanks']`) and Tank detail (`['tanks', tankId]`) each show distinct loading, unavailable/retry and empty states; a 404 from `GET tanks/:tankId` (missing, foreign or malformed id) shows "Tank not found", while network/5xx show unavailable/retry and a 401 goes through the session wrapper's redirect. The detail screen is keyed by `tankId`, so switching Tanks never shows another Tank's data. Add Tank validates a trimmed 1–80 character name and a positive finite volume in the preferred unit, converts it with `toLitres` at full precision and POSTs once (mutations never retry). Success seeds `['tanks', id]`, invalidates `['tanks']` and navigates to the new Tank; an unconfirmed failure keeps the entered values and asks the User to check the dashboard before deliberately retrying. Until WaterChanges exist, cards and detail show "No water changes yet." rather than a date.
 
 Mutations invalidate the narrowest prefix that covers what changed: logging a water change invalidates `['tanks', tankId, 'water-changes']` and `['tanks']` (the dashboard's `lastWaterChangeAt` is derived on read). Refetch-on-focus is left on — a phone that sleeps mid-log comes back current.
 

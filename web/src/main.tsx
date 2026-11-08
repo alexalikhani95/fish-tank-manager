@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createRoot } from "react-dom/client";
 import {
   QueryClientProvider,
@@ -9,11 +15,16 @@ import {
   BrowserRouter,
   Link,
   Navigate,
+  Outlet,
   Route,
   Routes,
   useLocation,
+  useNavigate,
+  useOutletContext,
+  useParams,
 } from "react-router";
-import { ApiError, createSession } from "./session";
+import { ApiError, createSession, type User } from "./session";
+import { formatVolume, toLitres, volumeLabels } from "./volume";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
@@ -99,15 +110,18 @@ function App() {
             }
           />
           <Route
-            path="/"
             element={
               me.data ? (
-                <Landing email={me.data.email} />
+                <Shell user={me.data} />
               ) : (
                 <Navigate to="/login" replace />
               )
             }
-          />
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="tanks/new" element={<AddTank />} />
+            <Route path="tanks/:tankId" element={<TankDetailRoute />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       )}
@@ -261,32 +275,279 @@ function AuthForm({ signup }: { signup: boolean }) {
     </section>
   );
 }
-function Landing({ email }: { email: string }) {
-  const online = useOnline();
+type Tank = { _id: string; name: string; volumeLitres: number };
+
+function Title({ children }: { children: ReactNode }) {
   const title = useRef<HTMLHeadingElement>(null);
-  const logout = useMutation({ mutationFn: session.signOut });
   useEffect(() => {
     title.current?.focus();
   }, []);
   return (
-    <section>
-      <h1 ref={title} tabIndex={-1} className="mb-3 text-3xl font-semibold">
-        You’re signed in
-      </h1>
-      <p className="mb-6 break-words text-muted-foreground">{email}</p>
-      <p className="mb-8">Welcome to your aquarium log.</p>
-      {logout.isError && (
-        <p role="alert" className="mb-4 text-destructive">
-          Sign-out was not confirmed. Please reconnect and try again.
-        </p>
-      )}
-      <Button
-        onClick={() => logout.mutate()}
-        disabled={!online || logout.isPending}
-        className="min-h-12"
+    <h1
+      ref={title}
+      tabIndex={-1}
+      className="mb-6 text-3xl font-semibold tracking-tight break-words"
+    >
+      {children}
+    </h1>
+  );
+}
+
+function Shell({ user }: { user: User }) {
+  const online = useOnline();
+  const logout = useMutation({ mutationFn: session.signOut });
+  return (
+    <>
+      <nav
+        aria-label="Signed in"
+        className="mb-8 flex flex-wrap items-center gap-x-5 gap-y-2"
       >
-        {logout.isPending ? "Signing out…" : "Sign out"}
+        <Link to="/">Dashboard</Link>
+        <Button
+          onClick={() => logout.mutate()}
+          disabled={!online || logout.isPending}
+          className="ml-auto"
+        >
+          {logout.isPending ? "Signing out…" : "Sign out"}
+        </Button>
+        <p className="w-full text-sm break-words text-muted-foreground">
+          {user.email}
+        </p>
+        {logout.isError && (
+          <p role="alert" className="w-full text-destructive">
+            Sign-out was not confirmed. Please reconnect and try again.
+          </p>
+        )}
+      </nav>
+      <Outlet context={user} />
+    </>
+  );
+}
+
+function Unavailable({ what, retry }: { what: string; retry: () => void }) {
+  const online = useOnline();
+  return (
+    <div className="rounded-md bg-muted p-4">
+      <p className="mb-4">
+        We couldn’t load {what}. Please try again when connected.
+      </p>
+      <Button onClick={retry} disabled={!online}>
+        Try again
       </Button>
+    </div>
+  );
+}
+
+function Dashboard() {
+  const user = useOutletContext<User>();
+  const tanks = useQuery({
+    queryKey: ["tanks"],
+    queryFn: ({ signal }) => session.request<Tank[]>("tanks", { signal }),
+  });
+  return (
+    <section>
+      <Title>Your Tanks</Title>
+      <p className="mb-6">
+        <Link to="/tanks/new">Add Tank</Link>
+      </p>
+      {tanks.isPending ? (
+        <p role="status">Loading your Tanks…</p>
+      ) : tanks.isError ? (
+        <Unavailable what="your Tanks" retry={() => void tanks.refetch()} />
+      ) : tanks.data.length === 0 ? (
+        <div className="rounded-md bg-muted p-4">
+          <p className="font-semibold">No Tanks yet</p>
+          <p>Add your first Tank to start its log.</p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {tanks.data.map((tank) => (
+            <li key={tank._id}>
+              <Link
+                to={`/tanks/${tank._id}`}
+                className="flex flex-col items-start rounded-md border border-input bg-white p-4 no-underline"
+              >
+                <span className="w-full text-lg font-semibold break-words underline underline-offset-4">
+                  {tank.name}
+                </span>
+                <span>{formatVolume(tank.volumeLitres, user.volumeUnit)}</span>
+                <span className="text-sm text-muted-foreground">
+                  No water changes yet.
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function AddTank() {
+  const user = useOutletContext<User>();
+  const online = useOnline();
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [volume, setVolume] = useState("");
+  const [checked, setChecked] = useState(false);
+  const feedback = useRef<HTMLDivElement>(null);
+  const unit = volumeLabels[user.volumeUnit];
+  const mutation = useMutation({
+    mutationFn: () =>
+      session.request<Tank>("tanks", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          // Full precision is stored; only display rounds.
+          volumeLitres: toLitres(Number(volume), user.volumeUnit),
+        }),
+      }),
+    onSuccess: (tank) => {
+      session.client.setQueryData(["tanks", tank._id], tank);
+      void session.client.invalidateQueries({
+        queryKey: ["tanks"],
+        exact: true,
+      });
+      void navigate(`/tanks/${tank._id}`);
+    },
+  });
+  useEffect(() => {
+    if (mutation.isError) feedback.current?.focus();
+  }, [mutation.isError]);
+  const error = mutation.error;
+  const serverErrors =
+    error instanceof ApiError && error.status === 400 ? error.errors : [];
+  const litres = Number(volume); // "" is 0, so it fails the same check.
+  const nameInvalid = name.trim().length < 1 || name.trim().length > 80;
+  const volumeInvalid = !Number.isFinite(litres) || litres <= 0;
+  const fieldError = (field: string, local: string | false) =>
+    (checked && local) ||
+    serverErrors
+      .filter((e) => e.field === field)
+      .map((e) => e.message)
+      .join(". ");
+  const nameError = fieldError(
+    "name",
+    nameInvalid && "Enter a name of 1–80 characters.",
+  );
+  const volumeError = fieldError(
+    "volumeLitres",
+    volumeInvalid && `Enter a volume above zero in ${unit}, like 80 or 80.5.`,
+  );
+  return (
+    <section>
+      <Title>Add Tank</Title>
+      <form
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          setChecked(true);
+          if (online && !mutation.isPending && !nameInvalid && !volumeInvalid)
+            mutation.mutate();
+        }}
+        className="space-y-5"
+      >
+        {error && (
+          <div
+            ref={feedback}
+            tabIndex={-1}
+            role="alert"
+            className="rounded-md border border-destructive p-4 text-destructive"
+          >
+            {serverErrors.length ? (
+              "Check the highlighted fields."
+            ) : (
+              <>
+                Your Tank was not confirmed as saved. Before trying again,{" "}
+                <Link to="/">check your Tanks</Link> so it isn’t added twice.
+              </>
+            )}
+          </div>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="tank-name">Name</Label>
+          <Input
+            id="tank-name"
+            value={name}
+            maxLength={80}
+            autoComplete="off"
+            onChange={(e) => setName(e.target.value)}
+            disabled={mutation.isPending}
+            aria-invalid={!!nameError}
+            aria-describedby="tank-name-error"
+            className="min-h-12"
+          />
+          <p id="tank-name-error" className="text-sm text-destructive">
+            {nameError}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="tank-volume">Volume ({unit})</Label>
+          <Input
+            id="tank-volume"
+            inputMode="decimal"
+            value={volume}
+            autoComplete="off"
+            onChange={(e) => setVolume(e.target.value)}
+            disabled={mutation.isPending}
+            aria-invalid={!!volumeError}
+            aria-describedby="tank-volume-error"
+            className="min-h-12"
+          />
+          <p id="tank-volume-error" className="text-sm text-destructive">
+            {volumeError}
+          </p>
+        </div>
+        <Button
+          type="submit"
+          disabled={!online || mutation.isPending}
+          className="min-h-12 w-full"
+        >
+          {mutation.isPending ? "Saving…" : "Create Tank"}
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+function TankDetailRoute() {
+  const { tankId = "" } = useParams();
+  // A fresh component per Tank: no state or data carries over between Tanks.
+  return <TankDetail key={tankId} tankId={tankId} />;
+}
+
+function TankDetail({ tankId }: { tankId: string }) {
+  const user = useOutletContext<User>();
+  const tank = useQuery({
+    queryKey: ["tanks", tankId],
+    queryFn: ({ signal }) =>
+      session.request<Tank>(`tanks/${tankId}`, { signal }),
+  });
+  if (tank.isPending) return <p role="status">Loading Tank…</p>;
+  if (tank.isError) {
+    return tank.error instanceof ApiError && tank.error.status === 404 ? (
+      <section>
+        <Title>Tank not found</Title>
+        <p>This Tank doesn’t exist or isn’t yours.</p>
+      </section>
+    ) : (
+      <section>
+        <Title>Tank unavailable</Title>
+        <Unavailable what="this Tank" retry={() => void tank.refetch()} />
+      </section>
+    );
+  }
+  return (
+    <section>
+      <Title>{tank.data.name}</Title>
+      <dl className="mb-6">
+        <dt className="text-sm text-muted-foreground">Volume</dt>
+        <dd className="m-0 text-lg">
+          {formatVolume(tank.data.volumeLitres, user.volumeUnit)}
+        </dd>
+      </dl>
+      <h2 className="mb-2 text-xl font-semibold">Water changes</h2>
+      <p>No water changes yet.</p>
     </section>
   );
 }

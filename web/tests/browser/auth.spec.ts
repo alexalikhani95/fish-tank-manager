@@ -34,9 +34,21 @@ test("real signup → me → logout → login carries the unchanged Secure cooki
   );
   await page.getByRole("button", { name: "Create User" }).click();
   expect((await signup).status()).toBe(201);
-  await expect(
-    page.getByRole("heading", { name: "You’re signed in" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your Tanks" })).toBeVisible();
+  await expect(page.getByText("No Tanks yet")).toBeVisible();
+  await page.getByRole("link", { name: "Add Tank", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Add Tank" })).toBeFocused();
+  await page.getByLabel("Name", { exact: true }).fill("River Tank");
+  await page.getByLabel("Volume (L)", { exact: true }).fill("80.25");
+  await page.getByRole("button", { name: "Create Tank" }).click();
+  await expect(page.getByRole("heading", { name: "River Tank" })).toBeFocused();
+  await expect(page.getByText("80 L", { exact: true })).toBeVisible();
+  const tankUrl = page.url();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "River Tank" })).toBeVisible();
+  await expect(page.getByText("No water changes yet.")).toBeVisible();
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await expect(page.getByRole("link", { name: /River Tank/ })).toBeVisible();
   const cookie = (await context.cookies()).find(
     (cookie) => cookie.name === "token",
   )!;
@@ -54,9 +66,7 @@ test("real signup → me → logout → login carries the unchanged Secure cooki
     }),
   ).toEqual({ status: 200, email });
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "You’re signed in" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your Tanks" })).toBeVisible();
   await page.goto("/signup");
   await expect(page).toHaveURL("http://localhost:4173/");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
@@ -107,9 +117,67 @@ test("real signup → me → logout → login carries the unchanged Secure cooki
   );
   await context.setOffline(false);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your Tanks" })).toBeVisible();
+  await page.getByRole("link", { name: /River Tank/ }).click();
+  await expect(page).toHaveURL(tankUrl);
+  await expect(page.getByRole("heading", { name: "River Tank" })).toBeVisible();
+  // Prepare an existing preference via the real API, without a settings screen.
+  expect(
+    await page.evaluate(
+      async () =>
+        (
+          await fetch("/api/v1/me", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ volumeUnit: "ukGal" }),
+          })
+        ).status,
+    ),
+  ).toBe(200);
+  await page.goto("/tanks/new");
+  await expect(page.getByRole("heading", { name: "Add Tank" })).toBeFocused();
+  await page.getByRole("button", { name: "Create Tank" }).click();
   await expect(
-    page.getByRole("heading", { name: "You’re signed in" }),
-  ).toBeVisible();
+    page.getByLabel("Name", { exact: true }),
+  ).toHaveAccessibleDescription("Enter a name of 1–80 characters.");
+  await expect(
+    page.getByLabel("Volume (UK gal)", { exact: true }),
+  ).toHaveAttribute("aria-invalid", "true");
+  await page.getByLabel("Name", { exact: true }).fill("UK Tank");
+  await page.getByLabel("Volume (UK gal)", { exact: true }).fill("10.25");
+  // An unconfirmed create keeps the values and is never retried automatically.
+  let posts = 0;
+  await page.route("**/api/v1/tanks", (route) =>
+    route.request().method() === "POST"
+      ? (posts++, route.abort())
+      : route.fallback(),
+  );
+  await page.getByRole("button", { name: "Create Tank" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Your Tank was not confirmed as saved",
+  );
+  expect(posts).toBe(1);
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("UK Tank");
+  await expect(page.getByLabel("Volume (UK gal)", { exact: true })).toHaveValue(
+    "10.25",
+  );
+  await page.unroute("**/api/v1/tanks");
+  await page.getByRole("button", { name: "Create Tank" }).click();
+  await expect(page.getByRole("heading", { name: "UK Tank" })).toBeFocused();
+  expect(
+    await page.evaluate(async () => {
+      const tanks = await (await fetch("/api/v1/tanks")).json();
+      return tanks.find((tank: { name: string }) => tank.name === "UK Tank")
+        .volumeLitres;
+    }),
+  ).toBeCloseTo(46.5974225, 10);
+  await page.reload();
+  await expect(page.getByText("10 UK gal", { exact: true })).toBeVisible();
+  await page.goto("/tanks/000000000000000000000000");
+  await expect(
+    page.getByRole("heading", { name: "Tank not found" }),
+  ).toBeFocused();
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -122,9 +190,7 @@ test("real signup → me → logout → login carries the unchanged Secure cooki
   await expect(page.getByRole("alert")).toContainText(
     "Sign-out was not confirmed",
   );
-  await expect(
-    page.getByRole("heading", { name: "You’re signed in" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your Tanks" })).toBeVisible();
   await page.unroute("**/api/v1/auth/logout");
   await context.clearCookies();
   await page.reload();
