@@ -15,10 +15,13 @@ We will parse **JSON bodies only**: the `form` and `multipart` parsers are off (
 
 We will set **`trimWhitespaces: false`**, so passwords count exactly as sent, in the API and in `user:set-password`.
 
+We will set **`convertEmptyStringsToNull: false`** (added 2026-11-08, ticket 03), so `''` reaches the schema as a string: an optional text field such as a WaterChange note can be empty, and `null` stays distinguishable from `''`.
+
 Alternative considered: keep default trimming and exempt the password field. Rejected: Adonis's setting is global, so it would mean a per-field exception to a parser default.
 
 ## Consequences
 
 - **Completes ADR-0006's CSRF defence.**
 - **Every string field's Zod schema must `.trim()` itself if it should be trimmed** (email, Tank name, any new field such as `brand`). A schema that forgets stores the text as sent.
+- **Every Zod schema must handle `''` itself** (since 2026-11-08): the parser no longer turns it into `null`, so a required string needs `.min(1)` (after `.trim()` where trimmed), and an optional one accepts `''` unless it says otherwise.
 - **A form-encoded or multipart route can't be added** without revisiting this ADR and ADR-0006.
