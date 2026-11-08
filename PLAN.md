@@ -51,8 +51,8 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 - [ ] REST API: `/api/v1/`, consistent resource naming, proper status codes, OpenAPI docs
 - [ ] React PWA — mobile-first, installable. Screens: sign in / sign up, dashboard, tank (details, fish, plants, water changes, water tests, trend chart), water change form, water test form, settings. Built as vertical slices alongside the API — real use on the keeper's phone is the acceptance test
 - [ ] Testing: unit tests for unit conversion and `readings` validation; HTTP tests against a Testcontainers Mongo for register → create tank → log change → log test → trend; a tenancy test proving another user's tank is a 404
-- [ ] Basic CI: GitHub Actions on every PR — `prettier --check` → lint → typecheck → tests (fast to slow). Branch protection on `main` blocks merge on red. `concurrency` with `cancel-in-progress`
-- [ ] Doc gates in CI, run on every PR including docs-only ones: `bash scripts/check-status-claims.sh` and `node --test 'scripts/**/*.test.mjs'`
+- [x] Basic CI: GitHub Actions on every PR — `prettier --check` → lint → typecheck → tests (fast to slow). Branch protection on `main` blocks merge on red. `concurrency` with `cancel-in-progress`. Completion requires a real PR run and protection readback; evidence: `tickets/ci-checks/issues/01-required-ci-checks.md`, current state: `docs/status.md`
+- [x] Doc gates in CI, run on every PR including docs-only ones: `bash scripts/check-status-claims.sh` and `node --test 'scripts/**/*.test.mjs'`; run both after validation failures unless setup failed or the run was cancelled. Completion requires inspecting the PR run; current state: `docs/status.md`
 - [ ] Dependabot (`.github/dependabot.yml`) — weekly npm updates + security PRs
 - [ ] Install skills after scaffold: `npx skills add mattpocock/skills` (lockfile); repo-local `running-the-app` + `reconciling-status` — see `docs/agents/workflow.md` → Skills
 - [ ] Naive-user testing agent — install techgarden's `naive-user` plugin once the PWA has its first screen; findings under `qa/naive-user/`

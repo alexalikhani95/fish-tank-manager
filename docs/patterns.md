@@ -13,3 +13,11 @@ Things built once that will be built again. Copy the files, change what's listed
 - **Copy:** `app/commands/set_password.ts` and `app/tests/functional/set_password.spec.ts`. Commands are found automatically; import them in tests through `#commands/*`.
 - **Change:** `commandName`, args, prompts and the work.
 - **Tests:** trap every prompt by its exact label; the spec's `createCommand` makes an untrapped prompt throw. Check `command.error` as well as `assertFailed()`, since `exec()` never rethrows.
+
+## PR checks with failure-independent doc gates
+
+- **Copy:** `.github/workflows/ci.yml` for a job wrapping existing validation commands.
+- **Change:** runtime, service, disposable boot values and required-check name for the target repo.
+- **Keep:** `!cancelled()` plus a successful install outcome on each doc gate, so an earlier failed validation cannot skip either gate. Verify with a failed validation run and a final successful PR run; read back branch protection against the emitted job name.
+
+- **Application tests:** use `scripts/ci-test.sh` to expose assembler import failures and require a positive passed-test count; a successful process exit alone does not prove tests executed.
