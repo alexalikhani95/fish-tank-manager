@@ -1,16 +1,27 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { Tank } from '#models/tank'
+import { WaterChange } from '#models/water_change'
 import { createTankSchema, updateTankSchema } from '#validators/tank_validator'
 
 /**
- * Every query filters on userId as well as the tank's own id. A Tank that is not
- * the caller's is a 404, never a 403 — the caller must not learn it exists
- * (docs/design/hld.md → Ownership).
+ * The list and create filter on userId themselves; `tanks/:tankId` routes get
+ * the caller's Tank from the Tank middleware. A Tank that is not the caller's is
+ * a 404, never a 403 — the caller must not learn it exists (docs/design/hld.md
+ * → Ownership).
  */
 export default class TanksController {
-  /** GET /api/v1/tanks */
+  /** GET /api/v1/tanks — each Tank with its derived `lastWaterChangeAt`. */
   async index({ userId }: HttpContext) {
-    return Tank.find({ userId }).sort({ createdAt: -1, _id: -1 })
+    const tanks = await Tank.find({ userId }).sort({ createdAt: -1, _id: -1 })
+    const latest = await WaterChange.aggregate<{ _id: unknown; at: string }>([
+      { $match: { userId } },
+      { $group: { _id: '$tankId', at: { $max: '$at' } } },
+    ])
+    const latestByTank = new Map(latest.map((row) => [String(row._id), row.at]))
+    return tanks.map((tank) => ({
+      ...tank.toJSON(),
+      lastWaterChangeAt: latestByTank.get(tank.id) ?? null,
+    }))
   }
 
   /** POST /api/v1/tanks */
@@ -20,30 +31,32 @@ export default class TanksController {
     return response.created(tank)
   }
 
-  /** GET /api/v1/tanks/:tankId */
-  async show({ params, response, userId }: HttpContext) {
-    const tank = await Tank.findOne({ _id: params.tankId, userId })
-    if (!tank) return response.notFound({ message: 'Tank not found' })
-    return tank
+  /** GET /api/v1/tanks/:tankId — the Tank with its derived `lastWaterChangeAt`. */
+  async show({ tank, userId }: HttpContext) {
+    const latest = await WaterChange.findOne({ tankId: tank._id, userId }).sort({ at: -1 })
+    return { ...tank.toJSON(), lastWaterChangeAt: latest?.at ?? null }
   }
 
   /** PATCH /api/v1/tanks/:tankId */
-  async update({ params, request, response, userId }: HttpContext) {
+  async update({ request, response, tank, userId }: HttpContext) {
     const payload = updateTankSchema.parse(request.body())
-    const tank = await Tank.findOneAndUpdate({ _id: params.tankId, userId }, payload, {
+    const updated = await Tank.findOneAndUpdate({ _id: tank._id, userId }, payload, {
       returnDocument: 'after',
       runValidators: true,
     })
-    if (!tank) return response.notFound({ message: 'Tank not found' })
-    return tank
+    if (!updated) return response.notFound({ message: 'Tank not found' })
+    return updated
   }
 
-  /** DELETE /api/v1/tanks/:tankId */
-  async destroy({ params, response, userId }: HttpContext) {
-    const tank = await Tank.findOneAndDelete({ _id: params.tankId, userId })
-    if (!tank) return response.notFound({ message: 'Tank not found' })
-    // Cascading WaterChanges, WaterTests and the S3 photo comes with those
-    // features (docs/design/lld.md → Cascade delete).
+  /**
+   * DELETE /api/v1/tanks/:tankId — children first, no transaction, so a failure
+   * part-way leaves a Tank without history, never history without a Tank
+   * (docs/design/lld.md → Cascade delete). Errors propagate as a 500.
+   */
+  async destroy({ response, tank, userId }: HttpContext) {
+    await WaterChange.deleteMany({ tankId: tank._id, userId })
+    await Tank.deleteOne({ _id: tank._id, userId })
+    // WaterTests and the S3 photo join the cascade with those features.
     return response.noContent()
   }
 }

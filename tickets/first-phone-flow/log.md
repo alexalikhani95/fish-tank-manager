@@ -22,3 +22,6 @@ build 02 · gpt-6.1-sol high · n/a
 build 02 local: Dashboard, Add Tank and Tank detail on existing Tank API, pure volume conversion/display, browser Tank create/view/reload/deep-link, field errors, unconfirmed create, missing Tank and UK-gallon preference; awaiting parent review, no merge/push
 checks 02: 56 API + 9 frontend + 15 scripts + 2 Chromium; typecheck/lint/build/format/status gates
 review 02 fixes: status check counts in one row; Add Tank amount parsed once with non-finite litres rejected; no raw name cap (trimmed 1–80 field error); focus first invalid field; browser covers Tank-to-Tank switch without stale data, over-long name and 1e308 volume
+build 03 · claude-opus-5-5 · n/a
+build 03 local: WaterChange GET/POST behind auth-first Tank middleware, strict day/percent/note validation with test clock, derived lastWaterChangeAt, children-first Tank delete, parser keeps empty strings; screens split per file with shared Field; history, log form, dashboard/detail summaries; browser specs split auth/tanks/water-changes; awaiting review, no merge/push
+checks 03: 76 API + 11 frontend + 15 scripts + 4 Chromium; typecheck/lint/build/format/status gates

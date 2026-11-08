@@ -16,7 +16,11 @@ const bodyParserConfig = defineConfig({
   },
 
   json: {
-    convertEmptyStringsToNull: true,
+    /**
+     * Off so an empty string stays a string: an empty WaterChange note is valid,
+     * a null one is not, and the schema must be able to tell them apart.
+     */
+    convertEmptyStringsToNull: false,
 
     /**
      * Off so a password counts exactly as sent. Fields that should be trimmed

@@ -33,14 +33,14 @@ Mongoose schemas with `timestamps: true` (`createdAt`, `updatedAt`). `_id` is th
 
 **water_changes**
 
-| field   | type                    | notes                                      |
-| ------- | ----------------------- | ------------------------------------------ |
-| tankId  | ObjectId → tanks        |                                            |
-| userId  | ObjectId → users        | denormalised for scoping                   |
-| at      | string `YYYY-MM-DD`     | a day, not an instant; ≤ UTC today + 1 day |
-| percent | int 1–100               |                                            |
-| note    | string, optional        |                                            |
-| index   | `{ tankId: 1, at: -1 }` | newest first; last change                  |
+| field   | type                    | notes                                                                                     |
+| ------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| tankId  | ObjectId → tanks        |                                                                                           |
+| userId  | ObjectId → users        | denormalised for scoping                                                                  |
+| at      | string `YYYY-MM-DD`     | a real day, not an instant; ≤ UTC today + 1 day; no lower bound; same-day entries allowed |
+| percent | int 1–100               |                                                                                           |
+| note    | string, optional        | kept exactly as sent; `''` and whitespace-only are valid, `null` is a 400                 |
+| index   | `{ tankId: 1, at: -1 }` | newest first; last change                                                                 |
 
 **water_tests**
 
@@ -86,15 +86,15 @@ Base `/api/v1`. Authenticated by the JWT cookie — or a bearer header (ADR-0006
 | GET / PATCH / DELETE | `tanks/:tankId`                   | DELETE cascades; PATCH replaces `fish` / `plants` wholesale                                                                                                                                             |
 | POST                 | `tanks/:tankId/photo`             | `{ contentType, size }` → `{ uploadUrl, key }`; allowlist `image/jpeg` \| `image/png` \| `image/webp`, ≤ 10 MB                                                                                          |
 | PUT / DELETE         | `tanks/:tankId/photo`             | PUT `{ key }` confirms upload; DELETE removes                                                                                                                                                           |
-| GET / POST           | `tanks/:tankId/water-changes`     |                                                                                                                                                                                                         |
+| GET / POST           | `tanks/:tankId/water-changes`     | POST `{ at, percent, note? }` → 201 with the created entry; unknown keys (including forged `tankId`/`userId`) stripped. GET → 200 full array, `at` then `_id` descending; `[]` when empty               |
 | PATCH / DELETE       | `tanks/:tankId/water-changes/:id` |                                                                                                                                                                                                         |
 | GET / POST           | `tanks/:tankId/water-tests`       |                                                                                                                                                                                                         |
 | PATCH / DELETE       | `tanks/:tankId/water-tests/:id`   | PATCH replaces `readings` wholesale                                                                                                                                                                     |
 | GET                  | `tanks/:tankId/water-tests/trend` | `?parameter=nitrate` → `[{ at, value }]` ascending                                                                                                                                                      |
 
-**Tank summary** (`GET tanks` and `GET tanks/:tankId`): the Tank plus `photoUrl` (presigned GET or null), `lastWaterChangeAt`, `lastWaterTestAt` — the last two from one `findOne` per collection sorted by `at: -1`, or an aggregation when the dashboard has many tanks.
+**Tank summary** (`GET tanks` and `GET tanks/:tankId`): the Tank's own fields plus `photoUrl` (presigned GET or null), `lastWaterChangeAt`, `lastWaterTestAt` — each nullable, derived on read and never stored on the Tank. `lastWaterChangeAt` is the max `at`: for the list, one `$group` aggregation over the User's `water_changes`; for detail, one `findOne` sorted by `at: -1`. List order is unchanged (`createdAt`, `_id` descending). `photoUrl` and `lastWaterTestAt` arrive with their features; POST/PATCH responses return the plain Tank.
 
-Status codes: 200/201 success, 204 delete or logout, 400 validation, 401 no/invalid token, 403 sign-up closed, **404 for any Tank that isn't the caller's**, 409 duplicate email on register (only a first-sign-up race).
+Status codes: 200/201 success, 204 delete or logout, 400 validation, 401 no/invalid token, 403 sign-up closed, **404 for any Tank that isn't the caller's**, 409 duplicate email on register (only a first-sign-up race). Auth runs first on `tanks/:tankId/*`: no token is a 401 whatever the id; only then is a malformed, missing or foreign id a 404.
 
 ## Algorithms
 
@@ -121,9 +121,11 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 
 **Trend.** `find({ tankId, userId, [`readings.${p}`]: { $exists: true } }, { at, [`readings.${p}`] }).sort({ at: 1 })`. Returns `[{ at, value }]`. Client charts it; temperature converted on the client like any other display.
 
-**Ownership check.** (Middleware arrives with the first child route; until then see Framework wiring.) Route middleware on the `tanks/:tankId` group: `Tank.findOne({ _id: tankId, userId: ctx.userId })` → null → 404 → else `ctx.tank`. Handlers read `ctx.tank`, never re-query by id alone. Child collections are then queried with `{ tankId: ctx.tank.id, userId }` — the second filter is belt-and-braces, cheap because of the index.
+**Ownership check.** Route middleware (`app/middleware/tank_middleware.ts`) on the `tanks/:tankId` group, after `auth`: a non-ObjectId id → 404; `Tank.findOne({ _id: tankId, userId: ctx.userId })` → null → 404 → else `ctx.tank`. Handlers read `ctx.tank`, never re-query by id alone. Child collections are then queried with `{ tankId: ctx.tank.id, userId }` — the second filter is belt-and-braces, cheap because of the index.
 
-**Cascade delete.** `deleteMany` on `water_changes` and `water_tests` by `tankId`, `DeleteObject` on `photoKey` if set, then `deleteOne` the Tank. Order: children first so a crash leaves a Tank with no history, not orphans with no Tank.
+**Cascade delete.** `deleteMany` on `water_changes` and `water_tests` by `{ tankId, userId }`, `DeleteObject` on `photoKey` if set, then `deleteOne` the Tank. Order: children first so a crash leaves a Tank with no history, not orphans with no Tank. A failing step throws (500) and stops the sequence; the success status stays 204. Built so far: WaterChanges, then the Tank.
+
+**Date bound.** `water_change_validator.ts` checks exact `YYYY-MM-DD` (regex), a real day (round-trips through a UTC `Date`, so `2023-02-29` and month 13 fail) and `at ≤ UTC today + 1` by string comparison, stopping at the first failure so each field reports one error. "Today" comes from `app/services/clock.ts` (`clock.now()`), the seam tests replace to fix the clock without touching the global `Date` that JWT expiry reads.
 
 ## Framework wiring
 
@@ -131,10 +133,10 @@ No rate limit on `auth/login` in v1. Lambda runs several containers, so an in-me
 - Mongoose registered as an Adonis provider (`providers/mongo_provider.ts`): one connection opened at boot from `MONGO_URL`, closed on shutdown; models under `app/models/` as Mongoose schemas.
 - Auth is one route middleware, `app/middleware/auth_middleware.ts` (ADR-0009), not a guard: reads the `token` cookie, else the `Authorization: Bearer` header (ADR-0006) — only one is tried — verifies HS256 with `jose`, loads the User and rejects if the JWT's `tokenVersion` no longer matches the User's. Sets `ctx.user` and `ctx.userId`. Token and cookie helpers, `UNAUTHORIZED_BODY` and the cookie attributes (explicit, host-only, `secure` in every environment, raw JWT value) live in `app/services/auth_token.ts`.
 - Validators under `app/validators/` as Zod schemas, one per request shape (ADR-0007); a `ZodError` becomes a 400 in `app/exceptions/handler.ts`; `readings` validator imports `PARAMETERS`.
-- Tank-ownership middleware under `app/middleware/tank_middleware.ts`, registered on the `tanks/:tankId` route group — arrives with the first `tanks/:tankId/*` child route. Until then `TanksController` filters on `{ _id: tankId, userId }` itself. `:tankId` must be 24 hex characters (route matcher), so a malformed id is a 404, not a 500.
+- Tank-ownership middleware under `app/middleware/tank_middleware.ts` (named `tank`), registered after `auth` on the `tanks/:tankId` route group (`GET`/`PATCH`/`DELETE tanks/:tankId` and `water-changes`); handlers read `ctx.tank`. It rejects a non-ObjectId `:tankId` with 404 itself, rather than a route matcher — a matcher would 404 before `auth` and so hide the 401. `GET`/`POST tanks` filter on `userId` themselves.
 - S3 via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` in `app/services/photo_service.ts`. Bucket and region from env.
 - Runs on Lambda via Lambda Web Adapter (ADR-0004): the same Docker image as local, adapter copied into `/opt/extensions/`, readiness check on `/api/v1/health`. The Mongo connection opened at boot is reused across warm invocations.
-- Body parsing is JSON only (`config/bodyparser.ts`): no form or multipart parser, which makes true the JSON-only half of ADR-0006's CSRF defence (ADR-0011). String trimming is off, so each Zod schema trims its own fields (email, Tank name).
+- Body parsing is JSON only (`config/bodyparser.ts`): no form or multipart parser, which makes true the JSON-only half of ADR-0006's CSRF defence (ADR-0011). String trimming is off, so each Zod schema trims its own fields (email, Tank name). `convertEmptyStringsToNull` is off too, so `''` reaches the schema as a string: an empty WaterChange note is valid and a `null` one is not.
 - Commands under `app/commands/`, found automatically by ace and imported from tests through the `#commands/*` alias. Shared test helpers (cookie helpers, token signing, the expected 401 body) in `app/tests/helpers/auth.ts`.
 - Env validated at boot in `start/env.ts` (`MONGO_URL`, `APP_KEY`, `JWT_SECRET` — at least 32 characters, boot refuses without it — `PHOTOS_BUCKET`, `AWS_REGION`, …).
 - Tests: Japa. Unit for conversion and readings validation; functional (HTTP) against the MongoDB supplied by `MONGO_URL`, with test collections cleared by suite hooks. CI supplies an isolated MongoDB service and `fishtank_test`; local runs must also supply an isolated test database. Testcontainers adoption is planned in `PLAN.md`. S3 calls stubbed in tests (presigner is pure — no network).
@@ -165,9 +167,11 @@ Deep links matter: the installed PWA reopens on the last screen, and a tank is s
 | `['tanks', tankId, 'water-tests']`      | `GET …/water-tests`                  |
 | `['tanks', tankId, 'trend', parameter]` | `GET …/water-tests/trend?parameter=` |
 
-**Tank screens.** The authenticated routes share one layout (Dashboard link, sign-out, User email) and read the current User's `volumeUnit` for labels and display. Dashboard (`['tanks']`) and Tank detail (`['tanks', tankId]`) each show distinct loading, unavailable/retry and empty states; a 404 from `GET tanks/:tankId` (missing, foreign or malformed id) shows "Tank not found", while network/5xx show unavailable/retry and a 401 goes through the session wrapper's redirect. The detail screen is keyed by `tankId`, so switching Tanks never shows another Tank's data. Add Tank validates a trimmed 1–80 character name and a positive finite volume in the preferred unit, converts it with `toLitres` at full precision and POSTs once (mutations never retry). Success seeds `['tanks', id]`, invalidates `['tanks']` and navigates to the new Tank; an unconfirmed failure keeps the entered values and asks the User to check the dashboard before deliberately retrying. Until WaterChanges exist, cards and detail show "No water changes yet." rather than a date.
+**Tank screens.** The authenticated routes share one layout (Dashboard link, sign-out, User email) and read the current User's `volumeUnit` for labels and display. Dashboard (`['tanks']`) and Tank detail (`['tanks', tankId]`) each show distinct loading, unavailable/retry and empty states; a 404 from `GET tanks/:tankId` (missing, foreign or malformed id) shows "Tank not found", while network/5xx show unavailable/retry and a 401 goes through the session wrapper's redirect. The detail screen is keyed by `tankId`, so switching Tanks never shows another Tank's data. Add Tank validates a trimmed 1–80 character name and a positive finite volume in the preferred unit, converts it with `toLitres` at full precision and POSTs once (mutations never retry). Success seeds `['tanks', id]`, invalidates `['tanks']` and navigates to the new Tank; an unconfirmed failure keeps the entered values and asks the User to check the dashboard before deliberately retrying. Cards show "Last water change: 1 Nov 2026" from `lastWaterChangeAt`, or "No water changes yet.", plus a "Log water change" link per Tank; detail shows the same summary, a log link and the history.
 
-Mutations invalidate the narrowest prefix that covers what changed: logging a water change invalidates `['tanks', tankId, 'water-changes']` and `['tanks']` (the dashboard's `lastWaterChangeAt` is derived on read). Refetch-on-focus is left on — a phone that sleeps mid-log comes back current.
+**WaterChange screens.** Detail reads `['tanks', tankId, 'water-changes']` (newest first: date, `N% replaced`, note as text) with its own loading, unavailable and empty ("No water changes yet." and how to add the first) states. `/tanks/:tankId/water-change` loads the Tank (404 → "Tank not found"), keyed by `tankId` so values never cross Tanks. The form defaults the date to local calendar today (`web/src/day.ts` → `localToday`), takes a whole-number 1–100 percentage and an optional note sent exactly as typed (omitted when empty); the API alone enforces the upper date bound and its field errors are shown on the field. Days are displayed by `formatDay` from their own components in UTC, so no timezone shifts them. Save POSTs once (no retry) and is disabled while pending or offline; offline shows a connection hint and keeps the values in memory, and reconnecting replays nothing. A confirmed save refetches `['tanks', tankId]` (detail and history) and `['tanks']` before navigating to the detail with "Water change saved."; an unconfirmed failure keeps the values and links to the history to check before a deliberate retry. Screens live one per file under `web/src/screens/`; shared `Field`, `Title`, `Unavailable` and `TankError` components under `web/src/components/`.
+
+Mutations invalidate the narrowest prefix that covers what changed: logging a water change invalidates `['tanks', tankId]` (detail and its history) and `['tanks']` exactly (the dashboard's `lastWaterChangeAt` is derived on read), refetching even inactive queries before showing them. Refetch-on-focus is left on — a phone that sleeps mid-log comes back current.
 
 Offline is out of v1 (`PRD.md` → Not in v1): `vite-plugin-pwa` precaches the shell so the app opens without a connection, but writes are not queued — the log forms disable themselves and show a "no connection" banner instead of accepting an entry that would be lost.
 
@@ -179,7 +183,7 @@ For the built frontend, run `npm run build:web` then `npm run preview --workspac
 
 Install Chromium once with `npx playwright install chromium` (CI adds `--with-deps`). `npm run test:browser` requires MongoDB and an existing frontend build, starts/stops its own API on port 3334 and preview on 4173, and rejects occupied ports. It exclusively resets `fishtank_browser` before/after the suite; never use this name for keeper data. `MONGO_BROWSER_URL` can select another Mongo port/host but must retain that exact database name. Japa must use a distinct disposable database (`fishtank_test`). Cleanup lives alongside API test helpers to reuse Mongoose without adding it to the browser bundle. No preexisting API/preview process is reused. For manually started development or preview commands, stop with Ctrl-C; MongoDB lifecycle remains with the caller.
 
-The auth browser flow uses real HTTP/API persistence, Chromium cookie transport and no certificate bypass/bearer injection. Additional error-path checks may intercept failures, never successful auth. Vitest and Playwright reject empty test runs. The `CI checks` job adds frontend lint/typecheck, unit tests, build and browser checks while retaining the API false-pass preflight and failure-independent doc gates.
+Specs share one User (sign-up closes after the first) and run in file order: `auth.spec.ts` is the empty-install journey (signup → add Tank → sign out → sign in → log a WaterChange → history/summary → reload) plus auth error paths; `tanks.spec.ts` and `water-changes.spec.ts` sign in through `helpers.ts` and cover their own screens' checks. The auth browser flow uses real HTTP/API persistence, Chromium cookie transport and no certificate bypass/bearer injection. Additional error-path checks may intercept failures, never successful auth. Vitest and Playwright reject empty test runs. The `CI checks` job adds frontend lint/typecheck, unit tests, build and browser checks while retaining the API false-pass preflight and failure-independent doc gates.
 
 **Photo pipeline (`web/`)** — the picked file is re-encoded before it is uploaded, never sent as-is:
 

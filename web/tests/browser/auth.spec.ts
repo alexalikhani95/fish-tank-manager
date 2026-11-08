@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { email, password } from "./helpers";
 
-test("real signup → me → logout → login carries the unchanged Secure cookie", async ({
+test("empty install: signup → Tank → logout → login → WaterChange → reload, with the unchanged Secure cookie", async ({
   page,
   context,
 }) => {
@@ -47,7 +47,7 @@ test("real signup → me → logout → login carries the unchanged Secure cooki
   await expect(page.getByRole("heading", { name: "River Tank" })).toBeVisible();
   await expect(page.getByText("No water changes yet.")).toBeVisible();
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
-  await expect(page.getByRole("link", { name: /River Tank/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^River Tank/ })).toBeVisible();
   const cookie = (await context.cookies()).find(
     (cookie) => cookie.name === "token",
   )!;
@@ -117,9 +117,44 @@ test("real signup → me → logout → login carries the unchanged Secure cooki
   await context.setOffline(false);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your Tanks" })).toBeVisible();
-  await page.getByRole("link", { name: /River Tank/ }).click();
+  await page.getByRole("link", { name: /^River Tank/ }).click();
   await expect(page).toHaveURL(tankUrl);
   await expect(page.getByRole("heading", { name: "River Tank" })).toBeVisible();
+  // Log a WaterChange after signing back in: real POST, history and summaries.
+  await page.getByRole("link", { name: "Log water change" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Log water change" }),
+  ).toBeFocused();
+  const today = await page.evaluate(() => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  });
+  await expect(page.getByLabel("Date", { exact: true })).toHaveValue(today);
+  await page.getByLabel("Date", { exact: true }).fill("2026-11-01");
+  await page.getByLabel("Percentage replaced (%)").fill("25");
+  await page.getByLabel("Note (optional)").fill("Cleaned the filter");
+  const save = page.waitForResponse("**/api/v1/tanks/*/water-changes");
+  await page.getByRole("button", { name: "Save water change" }).click();
+  expect((await save).status()).toBe(201);
+  await expect(page).toHaveURL(tankUrl);
+  await expect(page.getByRole("status")).toContainText("Water change saved.");
+  const history = page.getByRole("list", { name: "Water change history" });
+  await expect(history.getByRole("listitem")).toHaveCount(1);
+  await expect(history).toContainText("1 Nov 2026");
+  await expect(history).toContainText("25% replaced");
+  await expect(history).toContainText("Cleaned the filter");
+  await expect(page.getByText("None yet")).toHaveCount(0);
+  await page.reload();
+  await expect(history).toContainText("25% replaced");
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await expect(page.getByRole("link", { name: /^River Tank/ })).toContainText(
+    "Last water change: 1 Nov 2026",
+  );
+  await page.reload();
+  await expect(page.getByRole("link", { name: /^River Tank/ })).toContainText(
+    "Last water change: 1 Nov 2026",
+  );
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   expect(
     await page.evaluate(

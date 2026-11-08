@@ -13,6 +13,7 @@ import { Button } from "./components/ui/button";
 import { AddTank } from "./screens/add-tank";
 import { AuthForm } from "./screens/auth-form";
 import { Dashboard } from "./screens/dashboard";
+import { LogWaterChangeRoute } from "./screens/log-water-change";
 import { Shell } from "./screens/shell";
 import { TankDetailRoute } from "./screens/tank-detail";
 import "./styles.css";
@@ -95,6 +96,10 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="tanks/new" element={<AddTank />} />
             <Route path="tanks/:tankId" element={<TankDetailRoute />} />
+            <Route
+              path="tanks/:tankId/water-change"
+              element={<LogWaterChangeRoute />}
+            />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

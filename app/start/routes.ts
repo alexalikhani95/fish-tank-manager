@@ -39,12 +39,19 @@ router
       .group(() => {
         router.get('tanks', [controllers.Tanks, 'index'])
         router.post('tanks', [controllers.Tanks, 'store'])
+      })
+      .use(middleware.auth())
+
+    // Auth first, then the caller's Tank: no token is a 401 whatever the id;
+    // after that a malformed, missing or foreign id is a 404 (docs/design/lld.md).
+    router
+      .group(() => {
         router.get('tanks/:tankId', [controllers.Tanks, 'show'])
         router.patch('tanks/:tankId', [controllers.Tanks, 'update'])
         router.delete('tanks/:tankId', [controllers.Tanks, 'destroy'])
+        router.get('tanks/:tankId/water-changes', [controllers.WaterChanges, 'index'])
+        router.post('tanks/:tankId/water-changes', [controllers.WaterChanges, 'store'])
       })
-      // Not an ObjectId → no route matches → 404, instead of a Mongoose CastError → 500.
-      .where('tankId', /^[0-9a-f]{24}$/i)
-      .use(middleware.auth())
+      .use([middleware.auth(), middleware.tank()])
   })
   .prefix('/api/v1')

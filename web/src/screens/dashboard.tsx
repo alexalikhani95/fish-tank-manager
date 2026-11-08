@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useOutletContext } from "react-router";
 import { session, type Tank } from "../client";
 import type { User } from "../session";
+import { formatDay } from "../day";
 import { formatVolume } from "../volume";
 import { Title } from "../components/title";
 import { Unavailable } from "../components/unavailable";
@@ -40,8 +41,17 @@ export function Dashboard() {
                 </span>
                 <span>{formatVolume(tank.volumeLitres, user.volumeUnit)}</span>
                 <span className="text-sm text-muted-foreground">
-                  No water changes yet.
+                  {tank.lastWaterChangeAt
+                    ? `Last water change: ${formatDay(tank.lastWaterChangeAt)}`
+                    : "No water changes yet."}
                 </span>
+              </Link>
+              <Link
+                to={`/tanks/${tank._id}/water-change`}
+                aria-label={`Log water change for ${tank.name}`}
+                className="mt-1 inline-flex min-h-11 items-center"
+              >
+                Log water change
               </Link>
             </li>
           ))}
