@@ -175,15 +175,53 @@ Mutations invalidate the narrowest prefix that covers what changed: logging a wa
 
 Offline is out of v1 (`PRD.md` → Not in v1): `vite-plugin-pwa` precaches the shell so the app opens without a connection, but writes are not queued — the log forms disable themselves and show a "no connection" banner instead of accepting an entry that would be lost.
 
+**PWA shell (`web/vite.config.ts`).** `vite-plugin-pwa` in `generateSW` mode writes `manifest.webmanifest` (name, `standalone`, theme colour from `web/theme.ts`, 192/512 icons plus a separate maskable 512 entry) and `sw.js`. The worker precaches only the built shell — `index.html`, the hashed JS/CSS, `registerSW.js`, the manifest and the icons — and has no runtime caching, so API responses, cookies and writes always go to the network and nothing private is stored. Navigations fall back to the precached `index.html` except `/api`, `/api/*` and `/api?…` (`navigateFallbackDenylist`), so an API URL opened in the browser gets the API's own status and JSON, and an unreachable API is a failed request, never a 200 page. Built preview does the same on the server side: its `/api` proxy runs before the SPA fallback. `registerType: 'prompt'` without a prompt: a new worker waits until every window of the app is closed and takes over on the next cold open, so an update never reloads a screen mid-entry. A cold offline start opens the shell and, without a reachable `GET me`, shows "Unable to connect" with a retry rather than the sign-in form. Icons are PNGs drawn by `web/scripts/icons.mjs` (stdlib only) into `web/public/`; rerun it after changing the drawing.
+
 ### Local frontend auth and browser checks
 
 Use Node 24 and `npm ci` from the root. Root commands are listed in [AGENTS.md](../../AGENTS.md#commands). Start MongoDB and the API with the API's local `.env`; run `npm run dev:web` and open `http://localhost:5173`. Vite forwards `/api` to `http://127.0.0.1:3333`; `API_PROXY_TARGET` overrides that target for development or built preview. Keep the browser-facing hostname `localhost` for Chromium's Secure-cookie loopback behavior. This desktop exception does not provide trusted phone access.
 
-For the built frontend, run `npm run build:web` then `npm run preview --workspace web` (`http://localhost:4173`). Both dev and preview proxy API requests before SPA fallback. Preview has a strict port to avoid silently testing another origin. Ticket 04 extends this same Vite configuration for LAN HTTPS/PWA.
+For the built frontend, run `npm run build:web` then `npm run preview --workspace web` (`http://localhost:4173`). Both dev and preview proxy API requests before SPA fallback. Preview has a strict port to avoid silently testing another origin. The service worker only exists in the build, so PWA behaviour is checked against preview, never `dev:web`.
 
-Install Chromium once with `npx playwright install chromium` (CI adds `--with-deps`). `npm run test:browser` requires MongoDB and an existing frontend build, starts/stops its own API on port 3334 and preview on 4173, and rejects occupied ports. It exclusively resets `fishtank_browser` before/after the suite; never use this name for keeper data. `MONGO_BROWSER_URL` can select another Mongo port/host but must retain that exact database name. Japa must use a distinct disposable database (`fishtank_test`). Cleanup lives alongside API test helpers to reuse Mongoose without adding it to the browser bundle. No preexisting API/preview process is reused. For manually started development or preview commands, stop with Ctrl-C; MongoDB lifecycle remains with the caller.
+Install Chromium once with `npx playwright install chromium` (CI adds `--with-deps`). `npm run test:browser` requires MongoDB and an existing frontend build, starts/stops its own API on port 3334, preview on 4173, and a second preview on 4174 whose `/api` proxy points at a closed port (API unreachable while online), and rejects occupied ports. It exclusively resets `fishtank_browser` before/after the suite; never use this name for the User's data. `MONGO_BROWSER_URL` can select another Mongo port/host but must retain that exact database name. Japa must use a distinct disposable database (`fishtank_test`). Cleanup lives alongside API test helpers to reuse Mongoose without adding it to the browser bundle. No preexisting API/preview process is reused. For manually started development or preview commands, stop with Ctrl-C; MongoDB lifecycle remains with the caller.
 
-Specs share one User (sign-up closes after the first). `auth.spec.ts` runs first as its own Playwright project, which the `chromium` project (every other spec) depends on: it is the empty-install journey (signup → add Tank → sign out → sign in → log a WaterChange → log/summary → reload) plus auth error paths; `tanks.spec.ts` and `water-changes.spec.ts` sign in through `helpers.ts` and cover their own screens' checks. The auth browser flow uses real HTTP/API persistence, Chromium cookie transport and no certificate bypass/bearer injection. Additional error-path checks may intercept failures, never successful auth. Vitest and Playwright reject empty test runs. The `CI checks` job adds frontend lint/typecheck, unit tests, build and browser checks while retaining the API false-pass preflight and failure-independent doc gates.
+Specs share one User (sign-up closes after the first). `auth.spec.ts` runs first as its own Playwright project, which the `chromium` project (every other spec) depends on: it is the empty-install journey (signup → add Tank → sign out → sign in → log a WaterChange → log/summary → reload) plus auth error paths; `tanks.spec.ts`, `water-changes.spec.ts` and `pwa.spec.ts` sign in through `helpers.ts` and cover their own checks; `pwa.spec.ts` checks the manifest and icons, then, once the worker controls the page, that a Tank deep link is the worker-served shell while `/api/*` navigations and fetches return the API's own status and JSON, that no API URL is in any cache, and that offline keeps loaded data visible, makes the API a failed request and cold-opens a deep link to "Unable to connect" rather than sign-in. The auth browser flow uses real HTTP/API persistence, Chromium cookie transport and no certificate bypass/bearer injection. Additional error-path checks may intercept failures, never successful auth. Vitest and Playwright reject empty test runs. The `CI checks` job adds frontend lint/typecheck, unit tests, build and browser checks while retaining the API false-pass preflight and failure-independent doc gates.
+
+### Phone access (trusted local HTTPS)
+
+The User's phone uses the **built** PWA from the Mac over the home Wi-Fi, so installing and offline checks exercise the real service worker. `npm run phone` builds, then runs `vite preview --mode phone`: the same preview and `/api` proxy as above, but over HTTPS on every interface (port 4173). The phone's Secure cookie works because the origin is HTTPS; nothing about the cookie changes. No tunnel, no hosting.
+
+The certificate and key are local inputs, never committed (`.certs/` and `*.pem` are gitignored): `PHONE_HTTPS_CERT` and `PHONE_HTTPS_KEY`, paths relative to the repo root or absolute, defaulting to `.certs/phone.pem` and `.certs/phone-key.pem`. They come from [mkcert](https://github.com/FiloSottile/mkcert), whose local certificate authority (CA) the User trusts on the phone by hand. Nothing here installs trust anywhere; a phone that shows a certificate warning is not set up, and tapping through it does not count as a check.
+
+**Once, on the Mac** (`brew install mkcert` if missing). `mkcert -install` is not needed — it only makes the Mac's own browsers trust the CA. Regenerate the certificate whenever the Mac's Wi-Fi address changes.
+
+```sh
+mkdir -p .certs
+mkcert -cert-file .certs/phone.pem -key-file .certs/phone-key.pem \
+  "$(scutil --get LocalHostName).local" "$(ipconfig getifaddr en0)" localhost
+open "$(mkcert -CAROOT)"   # rootCA.pem goes to the phone; rootCA-key.pem never leaves the Mac
+```
+
+**Run** — three terminals from the repo root; the phone uses the API's own `.env` and development database:
+
+```sh
+npm run db      # MongoDB (docker compose)
+npm run dev     # API on 3333
+npm run phone   # build + HTTPS preview; prints the Network URL
+```
+
+Open `https://<LocalHostName>.local:4173` (or the printed `https://<ip>:4173`) on the phone. If macOS asks whether `node` may accept incoming connections, allow it. **Stop** with Ctrl-C in the `phone` and `dev` terminals, then `docker compose stop`.
+
+**iPhone (Safari).**
+
+1. Trust the CA: AirDrop `rootCA.pem` to the iPhone (or mail it to yourself and open it in Mail) → "Profile Downloaded". Settings → General → VPN & Device Management → the mkcert profile → Install. Then Settings → General → About → Certificate Trust Settings → turn on full trust for the mkcert root.
+2. Open the URL in Safari; it must load with no warning. Sign in.
+3. Install: Share → Add to Home Screen (keep "Open as Web App" on) → Add. Open it from the Home Screen: it runs standalone, without Safari's bars. It may keep its storage separate from Safari and ask you to sign in again.
+4. Reopen after closing it from the app switcher; turn on Airplane Mode (Wi-Fi off) and open it again for the offline checks.
+
+**Android (Chrome).** Copy `rootCA.pem` to the phone; Settings → Security → Encryption & credentials → Install a certificate → CA certificate (menu names vary by maker). Open the URL in Chrome, then ⋮ → Install app (or Add to Home screen).
+
+**Removing trust.** iPhone: Settings → General → VPN & Device Management → the mkcert profile → Remove Profile. Android: Encryption & credentials → Trusted credentials → User → the mkcert CA → Remove. Mac: `rm -rf .certs`; to destroy the CA itself, `mkcert -uninstall` (only if `-install` was ever run) then delete the `mkcert -CAROOT` folder. Delete the Home Screen app like any app.
 
 **Photo pipeline (`web/`)** — the picked file is re-encoded before it is uploaded, never sent as-is:
 
