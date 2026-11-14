@@ -189,6 +189,8 @@ Specs share one User (sign-up closes after the first). `auth.spec.ts` runs first
 
 ### Phone access (trusted local HTTPS)
 
+**Quick route — tunnel (ADR-0012).** Run `brew install cloudflared` once. Then run `npm run db`, `npm run dev` and `npm run phone:tunnel` in three terminals. Open the `https://….trycloudflare.com` URL that cloudflared prints, in Safari on the phone. Nothing needs installing or trusting on the phone. The URL is public while the command runs and changes each run. Ctrl-C ends the tunnel. The LAN route below keeps everything off the internet.
+
 The User's phone uses the **built** PWA from the Mac over the home Wi-Fi, so installing and offline checks exercise the real service worker. `npm run phone` builds, then runs `vite preview --mode phone`: the same preview and `/api` proxy as above, but over HTTPS on every interface (port 4173). The phone's Secure cookie works because the origin is HTTPS; nothing about the cookie changes. No tunnel, no hosting.
 
 The certificate and key are local inputs, never committed (`.certs/` and `*.pem` are gitignored): `PHONE_HTTPS_CERT` and `PHONE_HTTPS_KEY`, paths relative to the repo root or absolute, defaulting to `.certs/phone.pem` and `.certs/phone-key.pem`. They come from [mkcert](https://github.com/FiloSottile/mkcert), whose local certificate authority (CA) the User trusts on the phone by hand. Nothing here installs trust anywhere; a phone that shows a certificate warning is not set up, and tapping through it does not count as a check.
