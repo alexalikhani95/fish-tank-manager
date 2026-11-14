@@ -67,5 +67,13 @@ export default defineConfig(({ mode }) => ({
   preview:
     mode === "phone"
       ? { host: true, port: 4173, strictPort: true, proxy, https: phoneHttps() }
-      : { host: "localhost", port: 4173, strictPort: true, proxy },
+      : {
+          host: "localhost",
+          port: 4173,
+          strictPort: true,
+          proxy,
+          // `--mode tunnel` (npm run phone:tunnel): Cloudflare quick tunnel
+          // terminates HTTPS and forwards to this localhost preview (ADR-0012).
+          ...(mode === "tunnel" && { allowedHosts: [".trycloudflare.com"] }),
+        },
 }));

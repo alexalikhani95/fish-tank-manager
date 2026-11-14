@@ -20,7 +20,8 @@
     "test:web": "npm test --workspace web",
     "build:web": "npm run build --workspace web",
     "test:browser": "npm run test:browser --workspace web",
-    "phone": "npm run build:web && npm run preview --workspace web -- --mode phone"
+    "phone": "npm run build:web && npm run preview --workspace web -- --mode phone",
+    "phone:tunnel": "npm run build:web && (cloudflared tunnel --url http://localhost:4173 & npm run preview --workspace web -- --mode tunnel)"
   },
   "devDependencies": {
     "prettier": "^3.9.9"
