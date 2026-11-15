@@ -238,3 +238,54 @@ POST …/photo { contentType: 'image/jpeg', size: blob.size } → presigned PUT 
 Two problems, one solution. **Size**: a phone photo is 3–8 MB, the dashboard shows it as a tile, and the presigned GET's 1-hour TTL changes the URL often enough that the browser cache keeps missing — so the full original would be re-downloaded repeatedly. **HEIC**: iPhones shoot HEIC, Safari can decode and display it, Chrome and Firefox cannot. iOS often transcodes HEIC to JPEG on upload, but not reliably, so a HEIC that slipped through would render on the keeper's phone and break on a laptop.
 
 Re-encoding fixes size everywhere and makes HEIC a visible failure at pick time (`createImageBitmap` throws → "that format isn't supported, use JPEG") instead of a broken `<img>` weeks later. `heic` is therefore **not** in the allowlist: nothing but JPEG ever reaches S3. A WASM HEIC decoder (`heic2any`, libheif) would make Chrome work too, at a few hundred KB in a mobile-first bundle — rejected for v1.
+
+## Prod runbook
+
+Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `tickets/prod-deploy/spec.md`. Run from the repo root with the AWS CLI logged in to account `107014414355`. Sections for deploy, rollback and backup are added by the later tickets.
+
+### One-off setup
+
+**1. Terraform state bucket** (`eu-west-2`; Terraform cannot create its own state bucket). The name carries the account id so it is globally unique.
+
+```sh
+B=fishtank-tfstate-107014414355; R=eu-west-2
+aws s3api create-bucket --bucket $B --region $R \
+  --create-bucket-configuration LocationConstraint=$R
+aws s3api put-bucket-versioning --bucket $B --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket $B --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-public-access-block --bucket $B --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+```
+
+Check: `aws s3api get-bucket-versioning --bucket $B` (`Enabled`), `get-public-access-block` (all four `true`), `get-bucket-encryption` (`AES256`). Locking uses the S3 lock file (`use_lockfile`), no DynamoDB table.
+
+**2. Atlas M0 cluster** (by hand, in the Atlas web console).
+
+1. Create a project and a **M0 (free)** cluster on AWS in `eu-west-2` (London). If M0 is not offered there, use the nearest region that has it (e.g. `eu-west-1`) and note it in the ticket.
+2. Database Access: add a user with password auth and a custom role of **read and write on database `fishtank_prod` only** (no other database, no admin role). Use a long random password without special characters (`openssl rand -hex 24`), so the URL needs no escaping.
+3. Network Access: add `0.0.0.0/0` (Lambda has no fixed IP; ADR-0004).
+4. Connect → Drivers → copy the connection string and put the database name before the `?`:
+
+```
+mongodb+srv://<user>:<password>@<cluster>.<id>.mongodb.net/fishtank_prod?retryWrites=true&w=majority
+```
+
+**3. Secrets in SSM** (`SecureString`, `eu-west-2`). Terraform only reads these. The values are never printed or written to a file: `read -rs` takes the Atlas string without echoing it, and the two generated ones go straight from the generator into the command.
+
+`APP_KEY` is Adonis's encryption key (`node ace generate:key --show` prints `APP_KEY = <value>`). `JWT_SECRET` signs the login token and the app will not boot if it is under 32 characters; `openssl rand -base64 48` gives 64.
+
+```sh
+aws() { command aws --region eu-west-2 "$@"; }   # this shell only
+read -rs "MONGO_URL?Atlas connection string: "   # zsh; in bash: read -rsp "Atlas connection string: " MONGO_URL
+aws ssm put-parameter --type SecureString --name /fishtank/prod/MONGO_URL --value "$MONGO_URL"
+unset MONGO_URL
+
+aws ssm put-parameter --type SecureString --name /fishtank/prod/APP_KEY \
+  --value "$(cd app && node ace generate:key --show 2>/dev/null | sed -n 's/^APP_KEY = //p')"
+
+aws ssm put-parameter --type SecureString --name /fishtank/prod/JWT_SECRET \
+  --value "$(openssl rand -base64 48)"
+```
+
+Check (names only, no values): `aws ssm get-parameters-by-path --path /fishtank/prod --query 'Parameters[].Name'` lists all three. Do not use `--with-decryption` on screen. To change one later, rerun its command with `--overwrite`, then deploy (Terraform copies the new value into the Lambda). Rotating `APP_KEY` or `JWT_SECRET` signs the User out.
