@@ -120,3 +120,4 @@ Staging; the GitHub Actions deploy pipeline, OIDC and approval gate; automated n
 - **Two `node_modules` trees:** the root lockfile puts the API's deps under `app/node_modules` as well as the root; the image copies both, or the container dies on `reflect-metadata`. Don't "simplify" it to one. (ticket 01)
 - **`app/tests` must stay in the build context:** `node ace build` typechecks `bin/test.ts`, which imports the test bootstrap. (ticket 01)
 - **`package-lock.json` shows a local key-reordering diff** from `npm install` in the worktree. Never stage it. (setup)
+- **Function URL permissions come from the provider:** since AWS provider 6.28.0, `aws_lambda_function_url` with auth `NONE` adds both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` (`InvokedViaFunctionUrl`) for `*` on create, so no separate `aws_lambda_permission` (ticket 03 → Comments). The statements are not in state. (ticket 03)

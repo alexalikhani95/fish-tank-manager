@@ -241,7 +241,7 @@ Re-encoding fixes size everywhere and makes HEIC a visible failure at pick time 
 
 ## Prod runbook
 
-Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `tickets/prod-deploy/spec.md`. Run from the repo root with the AWS CLI logged in to account `107014414355`. Sections for deploy, rollback and backup are added by the later tickets.
+Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `tickets/prod-deploy/spec.md`. Run from the repo root with the AWS CLI logged in to account `107014414355`. Sections for rollback and backup are added by the later tickets.
 
 ### Infra layout
 
@@ -327,7 +327,7 @@ Check (names only, no values): `aws ssm get-parameters-by-path --region eu-west-
 `npm run deploy` from a clean tree (it refuses uncommitted changes; the image tag is the full commit SHA):
 
 1. `terraform init`.
-2. `terraform apply -target=aws_ecr_repository.api -auto-approve` (the Lambda cannot exist before its image; the `-target` warning is expected), `docker login` to ECR, then `docker buildx build --platform linux/arm64 --provenance=false -o type=image,oci-mediatypes=false,push=true,name=<repo>:<sha>` (a single-platform Docker v2 manifest; Lambda rejects OCI indexes).
+2. `terraform apply -target=aws_ecr_repository.api -auto-approve` (the Lambda cannot exist before its image; the `-target` warning is expected), `docker login` to ECR, then an arm64 build and push (the exact `buildx` flags: `scripts/deploy.sh`; Lambda rejects OCI indexes).
 3. Full `terraform apply -var image_tag=<sha>`, **interactive**: read the plan, type `yes`.
 
 It prints the health URL: `curl <function URL>api/v1/health` → 200 with the database connected. Running it again on the same commit re-pushes the tag and Terraform shows no changes.
