@@ -19,7 +19,7 @@ Agent:
 
 Keeper:
 
-- [ ] Runs `npm run deploy`, reads the plan, types `yes`; then `curl <function URL>/api/v1/health` → 200 `database: connected`, pasted into `## Comments`
+- [x] Runs `npm run deploy`, reads the plan, types `yes`; then `curl <function URL>/api/v1/health` → 200 `database: connected`, pasted into `## Comments`
 - [ ] Runs it again on the same commit: push succeeds (mutable tag) and Terraform shows no changes — expected, not a bug to fix
 
 ## Comments
@@ -32,3 +32,5 @@ Keeper:
 - **Dirty tree:** `npm run deploy` refuses while `package-lock.json` carries its local diff in this worktree; run it from a clean checkout (or after restoring that file).
 
 - 2026-11-15 (session): keeper put all three SSM parameters in eu-west-2 (lengths checked, values not read out: MONGO_URL 90, APP_KEY 32, JWT_SECRET 64). Atlas M0 is in AWS eu-west-2, project `fish-tank-manager`, user scoped to readWrite@fishtank_prod, access list 0.0.0.0/0. `terraform plan` (Terraform 1.17.2): **9 to add, 0 to change, 0 to destroy** — log group, ECR repo + lifecycle, IAM role + logs policy, Lambda function (secrets shown as `(sensitive value)`), function URL, two URL permissions.
+- 2026-11-15 (keeper): first `npm run deploy` of `1e7bdc7`: ECR created by the `-target` apply, image built and pushed, full apply **8 added, 0 changed, 0 destroyed**, health check through the function URL returned `{"status":"ok","database":"connected"}`. Function URL: `https://t6t74nkahza33pu2rzzjh5zvre0utcip.lambda-url.eu-west-2.on.aws/`.
+- **Handoff (context limit reached):** ticket 03 is built and live. Only open item: the keeper's second same-commit run (mutable tag, expect "no changes") — optional, can be folded into ticket 04's first deploy. **Next: ticket 04** (PWA + CloudFront), agent part, strong model; keeper runs its deploy. Then 05, then step 5 self-check, step 6 PR.

@@ -18,3 +18,5 @@ review 03 · opus · 74261
 fix 03 review · sonnet · 48604
 built 03 (agent part, plan pending) 9e7060c
 plan 03 · main session · 9 to add
+built 03 1e7bdc7 (keeper deploy: health ok)
+handoff: context limit after ticket 03; next ticket 04
