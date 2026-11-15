@@ -113,3 +113,10 @@ Staging; the GitHub Actions deploy pipeline, OIDC and approval gate; automated n
 - Tickets approved as written (5 tickets, 2026-11-15).
 - **The keeper runs every real `terraform apply` / `npm run deploy`** (tickets 03, 04). Builder agents write code and run `fmt`, `validate` and `plan` only; they never apply. Ticket 02's agent may create the state bucket.
 - Resumed in the same session at the keeper's choice.
+
+## Discovered
+
+- **Push with a Docker v2 manifest:** a plain `--load` build exports as OCI. Push with `docker buildx build --platform linux/arm64 --provenance=false -o type=image,oci-mediatypes=false,push=true,name=<repo>:<tag>` (noted in the Dockerfile header). (ticket 01)
+- **Two `node_modules` trees:** the root lockfile puts the API's deps under `app/node_modules` as well as the root; the image copies both, or the container dies on `reflect-metadata`. Don't "simplify" it to one. (ticket 01)
+- **`app/tests` must stay in the build context:** `node ace build` typechecks `bin/test.ts`, which imports the test bootstrap. (ticket 01)
+- **`package-lock.json` shows a local key-reordering diff** from `npm install` in the worktree. Never stage it. (setup)

@@ -251,21 +251,29 @@ Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `ticket
 B=fishtank-tfstate-107014414355; R=eu-west-2
 aws s3api create-bucket --bucket $B --region $R \
   --create-bucket-configuration LocationConstraint=$R
-aws s3api put-bucket-versioning --bucket $B --versioning-configuration Status=Enabled
-aws s3api put-bucket-encryption --bucket $B --server-side-encryption-configuration \
+aws s3api put-bucket-versioning --bucket $B --region $R --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket $B --region $R --server-side-encryption-configuration \
   '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
-aws s3api put-public-access-block --bucket $B --public-access-block-configuration \
+aws s3api put-public-access-block --bucket $B --region $R --public-access-block-configuration \
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
 
-Check: `aws s3api get-bucket-versioning --bucket $B` (`Enabled`), `get-public-access-block` (all four `true`), `get-bucket-encryption` (`AES256`). Locking uses the S3 lock file (`use_lockfile`), no DynamoDB table.
+Check:
+
+```sh
+aws s3api get-bucket-versioning --bucket fishtank-tfstate-107014414355 --region eu-west-2     # Enabled
+aws s3api get-public-access-block --bucket fishtank-tfstate-107014414355 --region eu-west-2   # all four true
+aws s3api get-bucket-encryption --bucket fishtank-tfstate-107014414355 --region eu-west-2     # AES256
+```
+
+Locking uses the S3 lock file (`use_lockfile`), no DynamoDB table.
 
 **2. Atlas M0 cluster** (by hand, in the Atlas web console).
 
 1. Create a project and a **M0 (free)** cluster on AWS in `eu-west-2` (London). If M0 is not offered there, use the nearest region that has it (e.g. `eu-west-1`) and note it in the ticket.
 2. Database Access: add a user with password auth and a custom role of **read and write on database `fishtank_prod` only** (no other database, no admin role). Use a long random password without special characters (`openssl rand -hex 24`), so the URL needs no escaping.
 3. Network Access: add `0.0.0.0/0` (Lambda has no fixed IP; ADR-0004).
-4. Connect → Drivers → copy the connection string and put the database name before the `?`:
+4. Connect → Drivers → copy the connection string. Replace `<db_password>` (angle brackets included) with the password, and put `fishtank_prod` between the `/` and the `?` that are already there (no extra `/`). The trailing `appName=…` is harmless:
 
 ```
 mongodb+srv://<user>:<password>@<cluster>.<id>.mongodb.net/fishtank_prod?retryWrites=true&w=majority
@@ -275,17 +283,23 @@ mongodb+srv://<user>:<password>@<cluster>.<id>.mongodb.net/fishtank_prod?retryWr
 
 `APP_KEY` is Adonis's encryption key (`node ace generate:key --show` prints `APP_KEY = <value>`). `JWT_SECRET` signs the login token and the app will not boot if it is under 32 characters; `openssl rand -base64 48` gives 64.
 
+Run the `read` line **on its own** first (paste it, press Enter, paste the connection string, press Enter), then paste the rest. It is zsh; in bash use `read -rsp "Atlas connection string: " MONGO_URL`.
+
 ```sh
-aws() { command aws --region eu-west-2 "$@"; }   # this shell only
-read -rs "MONGO_URL?Atlas connection string: "   # zsh; in bash: read -rsp "Atlas connection string: " MONGO_URL
-aws ssm put-parameter --type SecureString --name /fishtank/prod/MONGO_URL --value "$MONGO_URL"
-unset MONGO_URL
-
-aws ssm put-parameter --type SecureString --name /fishtank/prod/APP_KEY \
-  --value "$(cd app && node ace generate:key --show 2>/dev/null | sed -n 's/^APP_KEY = //p')"
-
-aws ssm put-parameter --type SecureString --name /fishtank/prod/JWT_SECRET \
-  --value "$(openssl rand -base64 48)"
+read -rs "MONGO_URL?Atlas connection string: "
 ```
 
-Check (names only, no values): `aws ssm get-parameters-by-path --path /fishtank/prod --query 'Parameters[].Name'` lists all three. Do not use `--with-decryption` on screen. To change one later, rerun its command with `--overwrite`, then deploy (Terraform copies the new value into the Lambda). Rotating `APP_KEY` or `JWT_SECRET` signs the User out.
+```sh
+aws ssm put-parameter --region eu-west-2 --type SecureString --name /fishtank/prod/MONGO_URL --value="$MONGO_URL"
+unset MONGO_URL
+
+aws ssm put-parameter --region eu-west-2 --type SecureString --name /fishtank/prod/APP_KEY \
+  --value="$(cd app && node ace generate:key --show 2>/dev/null | sed -n 's/^APP_KEY = //p')"
+
+aws ssm put-parameter --region eu-west-2 --type SecureString --name /fishtank/prod/JWT_SECRET \
+  --value="$(openssl rand -base64 48)"
+```
+
+`--value=` (with `=`) matters: a generated `APP_KEY` can start with `-`, which the CLI would otherwise read as a flag.
+
+Check (names only, no values): `aws ssm get-parameters-by-path --region eu-west-2 --path /fishtank/prod --query 'Parameters[].Name'` lists all three. Without `--region eu-west-2` it looks in your default region and shows `[]`. Do not use `--with-decryption` on screen. To change one later, rerun its command with `--overwrite` (for `MONGO_URL`, rerun the `read` line first: the variable was unset); without `--overwrite` a rerun fails with `ParameterAlreadyExists` and changes nothing. Then deploy (Terraform copies the new value into the Lambda). Rotating `APP_KEY` or `JWT_SECRET` signs the User out.
