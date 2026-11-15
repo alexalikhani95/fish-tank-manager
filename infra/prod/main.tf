@@ -126,6 +126,144 @@ resource "aws_lambda_permission" "url_invoke" {
   invoked_via_function_url = true
 }
 
+# PWA: private bucket, read only by CloudFront through OAC.
+resource "aws_s3_bucket" "pwa" {
+  bucket = "fishtank-pwa-107014414355" # account id keeps the global name unique
+}
+
+resource "aws_s3_bucket_public_access_block" "pwa" {
+  bucket                  = aws_s3_bucket.pwa.id
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_policy" "pwa" {
+  bucket = aws_s3_bucket.pwa.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${aws_s3_bucket.pwa.arn}/*"
+      Condition = { StringEquals = { "AWS:SourceArn" = aws_cloudfront_distribution.app.arn } }
+    }]
+  })
+  depends_on = [aws_s3_bucket_public_access_block.pwa]
+}
+
+resource "aws_cloudfront_origin_access_control" "pwa" {
+  name                              = "fishtank-pwa"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+# SPA deep links: a path with no file extension gets the app shell. Default behaviour only, so
+# /api/* is never rewritten. Not custom error responses: those would turn the API's JSON errors
+# into HTML (ADR-0006).
+resource "aws_cloudfront_function" "spa" {
+  name    = "fishtank-spa-rewrite"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = <<-JS
+    function handler(event) {
+      var request = event.request;
+      if (!/\.[^/]*$/.test(request.uri)) request.uri = '/index.html';
+      return request;
+    }
+  JS
+}
+
+data "aws_cloudfront_cache_policy" "optimized" {
+  name = "Managed-CachingOptimized"
+}
+
+data "aws_cloudfront_cache_policy" "disabled" {
+  name = "Managed-CachingDisabled"
+}
+
+# Forwards Cookie, query and headers, but not Host: the function URL rejects any other host.
+data "aws_cloudfront_origin_request_policy" "all_but_host" {
+  name = "Managed-AllViewerExceptHostHeader"
+}
+
+# One HTTPS origin for the PWA and /api/*, so the auth cookie works unchanged (ADR-0006).
+# The function URL stays public (auth NONE, ADR-0012): CloudFront is not a security boundary here.
+resource "aws_cloudfront_distribution" "app" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  price_class         = "PriceClass_100"
+  default_root_object = "index.html"
+
+  origin {
+    origin_id                = "pwa"
+    domain_name              = aws_s3_bucket.pwa.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.pwa.id
+  }
+
+  origin {
+    origin_id   = "api"
+    domain_name = trimsuffix(trimprefix(aws_lambda_function_url.api.function_url, "https://"), "/")
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  default_cache_behavior {
+    target_origin_id       = "pwa"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    cache_policy_id        = data.aws_cloudfront_cache_policy.optimized.id
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa.arn
+    }
+  }
+
+  ordered_cache_behavior {
+    path_pattern             = "/api/*"
+    target_origin_id         = "api"
+    viewer_protocol_policy   = "redirect-to-https"
+    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods           = ["GET", "HEAD"]
+    compress                 = true
+    cache_policy_id          = data.aws_cloudfront_cache_policy.disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_but_host.id
+  }
+
+  # No custom_error_response: it would apply to /api/* too (see the function above).
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+}
+
+output "cloudfront_url" {
+  value = "https://${aws_cloudfront_distribution.app.domain_name}"
+}
+
+output "distribution_id" {
+  value = aws_cloudfront_distribution.app.id
+}
+
+output "pwa_bucket" {
+  value = aws_s3_bucket.pwa.bucket
+}
+
 output "ecr_repository_url" {
   value = aws_ecr_repository.api.repository_url
 }
