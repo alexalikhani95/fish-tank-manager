@@ -330,7 +330,7 @@ Check (names only, no values): `aws ssm get-parameters-by-path --region eu-west-
 
 1. `terraform init`.
 2. `terraform apply -target=aws_ecr_repository.api -auto-approve` (the Lambda cannot exist before its image; the `-target` warning is expected), `docker login` to ECR, then an arm64 build and push (the exact `buildx` flags: `scripts/deploy.sh`; Lambda rejects OCI indexes).
-3. `npm run build:web`, then the full `terraform apply -var image_tag=<sha>`, **interactive**: read the plan, type `yes`. The first one creates the distribution and waits until it is deployed (several minutes).
+3. `npm run build:web`, then the full `terraform apply -var image_tag=<sha>`, **interactive**: read the plan, type `yes`. The first one creates the distribution and waits for it to finish rolling out (several minutes).
 4. Uploads `web/dist` to the PWA bucket: `assets/` (content-hashed) with `public, max-age=31536000, immutable`; everything else (`index.html`, `sw.js`, `registerSW.js`, the manifest, icons) with `no-cache`; files no longer in the build are deleted after the new ones are up.
 5. Invalidates `/*` and waits for it.
 6. **Smoke check** through the CloudFront URL; any miss fails the command: `/api/v1/health` 200 JSON with `"database":"connected"` (retried for a cold start), a second call `Miss from cloudfront` (`x-cache`); `/api/v1/me` 401 JSON without a cookie and with `Cookie: token=garbage`; `POST /api/v1/auth/logout` 204 with a `token=` `Set-Cookie` (POST and Set-Cookie pass through; cookie forwarding itself is proven only by the keeper's phone sign-in); `/` and `/tanks/x` 200 HTML; `/manifest.webmanifest` is `application/manifest+json` (the script uploads it with that type); `/index.html` and `/sw.js` carry `no-cache`.

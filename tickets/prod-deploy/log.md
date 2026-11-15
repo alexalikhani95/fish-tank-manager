@@ -20,3 +20,8 @@ built 03 (agent part, plan pending) 9e7060c
 plan 03 · main session · 9 to add
 built 03 1e7bdc7 (keeper deploy: health ok)
 handoff: context limit after ticket 03; next ticket 04
+build 04 (agent part) · opus · 83367
+built 04 (agent part, keeper deploy pending) c1e769e
+VERDICT review-04 blockers=0 total=6 file=tickets/prod-deploy/checks/review-04.md
+review 04 · opus · 76570
+fix 04 review · sonnet · 52236
