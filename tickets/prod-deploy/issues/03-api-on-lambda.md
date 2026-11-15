@@ -10,7 +10,7 @@
 
 Agent:
 
-- [x] Flat Terraform root at `infra/prod/` in `eu-west-2`: S3 backend with `use_lockfile` on `fishtank-tfstate-107014414355` (from 02), own state key; outputs ECR repository URL, function name, function URL; ECR (`MUTABLE`, keep last 10); Lambda (`arm64`, 1024 MB, 15 s, no reserved concurrency, 14-day log group, logs-only role); env per spec incl. `APP_URL=https://localhost`; secrets via SSM data sources; function URL auth `NONE` plus the `lambda:InvokeFunction` permission to `*`
+- [x] Flat Terraform root at `infra/prod/` in `eu-west-2`: S3 backend with `use_lockfile` on `fishtank-tfstate-107014414355` (from 02), own state key; outputs ECR repository URL, function name, function URL; ECR (`MUTABLE`, keep last 10); Lambda (`arm64`, 1024 MB, 15 s, no reserved concurrency, 14-day log group, logs-only role); env per spec incl. `APP_URL=https://localhost`; secrets via SSM data sources; function URL auth `NONE` plus two explicit `aws_lambda_permission`s to `*` (`lambda:InvokeFunctionUrl`, and `lambda:InvokeFunction` with `invoked_via_function_url = true`)
 - [x] Terraform ignore entries in `.gitignore`; provider lock file committed; `terraform fmt -check` and `terraform validate` pass
 - [x] `npm run deploy` script (steps 1–3 for now, minus the PWA build): refuses a dirty tree; `terraform init`; `-target` ECR apply with `-auto-approve`; ECR login; arm64 build + push tagged with the full SHA; interactive full apply with that tag
 - [ ] `terraform plan` (with an image tag) output summary quoted in `## Comments`; no apply by the agent
