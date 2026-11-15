@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Prod deploy from the laptop (ADR-0012; runbook in docs/design/lld.md → Prod runbook).
-set -eu
+set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 if [ -n "$(git status --porcelain)" ]; then
@@ -15,6 +15,7 @@ $TF init -input=false
 
 # 2. The Lambda needs an image before it can exist: ECR first (the -target warning is expected),
 #    then build and push. Docker v2 manifest, single platform: Lambda rejects OCI indexes.
+# force_delete stays off on the repository: replacing one that holds images fails instead of wiping them.
 $TF apply -target=aws_ecr_repository.api -var "image_tag=$TAG" -auto-approve
 REPO=$($TF output -raw ecr_repository_url)
 aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin "${REPO%%/*}"
@@ -24,4 +25,7 @@ docker buildx build --platform linux/arm64 --provenance=false \
 # 3. Full apply, interactive: read the plan, type yes.
 $TF apply -var "image_tag=$TAG"
 
-echo "✓ deployed $TAG: $($TF output -raw function_url)api/v1/health"
+URL="$($TF output -raw function_url)api/v1/health"
+curl -fsS --retry 5 --retry-all-errors --retry-delay 3 "$URL"
+echo
+echo "✓ deployed $TAG: $URL"

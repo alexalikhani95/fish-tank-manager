@@ -107,6 +107,25 @@ resource "aws_lambda_function_url" "api" {
   authorization_type = "NONE"
 }
 
+# Explicit, tracked in state. Statement IDs differ from the provider's own (it adds FunctionURLAllow*
+# on create), or AddPermission would conflict. Keep invoked_via_function_url: without it any AWS
+# account could call lambda:Invoke directly.
+resource "aws_lambda_permission" "url_public" {
+  statement_id           = "PublicFunctionUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.api.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "url_invoke" {
+  statement_id             = "PublicInvokeViaFunctionUrl"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.api.function_name
+  principal                = "*"
+  invoked_via_function_url = true
+}
+
 output "ecr_repository_url" {
   value = aws_ecr_repository.api.repository_url
 }
