@@ -243,6 +243,22 @@ Re-encoding fixes size everywhere and makes HEIC a visible failure at pick time 
 
 Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `tickets/prod-deploy/spec.md`. Run from the repo root with the AWS CLI logged in to account `107014414355`. Sections for deploy, rollback and backup are added by the later tickets.
 
+### Infra layout
+
+One flat Terraform root, `infra/prod/main.tf` (ADR-0012): no modules until staging gives them a second user. Region `eu-west-2`. State in the bucket from step 1 below, key `prod/terraform.tfstate`, locked by the S3 lock file. The provider lock file `infra/prod/.terraform.lock.hcl` is committed; `.terraform/`, state and `*.tfvars` are gitignored.
+
+| Resource              | Shape                                                                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ECR `fishtank-api`    | tags `MUTABLE` (re-deploying a commit re-pushes its tag); lifecycle keeps the last 10 images                                                                            |
+| Lambda `fishtank-api` | the ECR image at `:<full commit SHA>` (`image_tag` variable), `arm64`, 1024 MB, 15 s, no reserved concurrency (ADR-0004)                                                |
+| Log group             | `/aws/lambda/fishtank-api`, 14 days; the execution role can only write to it                                                                                            |
+| Function URL          | auth `NONE`. AWS requires `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` for `*`; the AWS provider (≥ 6.28) adds both statements itself when it creates the URL |
+| Outputs               | `ecr_repository_url`, `function_name`, `function_url`                                                                                                                   |
+
+**Lambda environment.** Plain: `NODE_ENV=production`, `HOST=0.0.0.0`, `PORT=8080`, `LOG_LEVEL=info`, `TZ=UTC`, `AWS_LWA_READINESS_CHECK_PATH=/api/v1/health`, and `APP_URL=https://localhost` — `start/env.ts` requires it but nothing reads it, and the real URL would make a Terraform cycle. Secret: `MONGO_URL`, `APP_KEY`, `JWT_SECRET`, read by `aws_ssm_parameter` data sources from `/fishtank/prod/<NAME>` (step 3 below) and copied into the environment. Plan shows them as `(sensitive value)`; the values sit in the state file and the Lambda console (ADR-0012). The parameters must exist before any full plan or apply.
+
+**Terraform ≥ 1.10** (for `use_lockfile`). Homebrew's own `terraform` formula is frozen at 1.5.7: `brew install hashicorp/tap/terraform`.
+
 ### One-off setup
 
 **1. Terraform state bucket** (`eu-west-2`; Terraform cannot create its own state bucket). The name carries the account id so it is globally unique.
@@ -303,3 +319,15 @@ aws ssm put-parameter --region eu-west-2 --type SecureString --name /fishtank/pr
 `--value=` (with `=`) matters: a generated `APP_KEY` can start with `-`, which the CLI would otherwise read as a flag.
 
 Check (names only, no values): `aws ssm get-parameters-by-path --region eu-west-2 --path /fishtank/prod --query 'Parameters[].Name'` lists all three. Without `--region eu-west-2` it looks in your default region and shows `[]`. Do not use `--with-decryption` on screen. To change one later, rerun its command with `--overwrite` (for `MONGO_URL`, rerun the `read` line first: the variable was unset); without `--overwrite` a rerun fails with `ParameterAlreadyExists` and changes nothing. Then deploy (Terraform copies the new value into the Lambda). Rotating `APP_KEY` or `JWT_SECRET` signs the User out.
+
+**4. `terraform init`** — `terraform -chdir=infra/prod init`. The deploy runs it every time, so this is only needed to plan by hand.
+
+### Deploy
+
+`npm run deploy` from a clean tree (it refuses uncommitted changes; the image tag is the full commit SHA):
+
+1. `terraform init`.
+2. `terraform apply -target=aws_ecr_repository.api -auto-approve` (the Lambda cannot exist before its image; the `-target` warning is expected), `docker login` to ECR, then `docker buildx build --platform linux/arm64 --provenance=false -o type=image,oci-mediatypes=false,push=true,name=<repo>:<sha>` (a single-platform Docker v2 manifest; Lambda rejects OCI indexes).
+3. Full `terraform apply -var image_tag=<sha>`, **interactive**: read the plan, type `yes`.
+
+It prints the health URL: `curl <function URL>api/v1/health` → 200 with the database connected. Running it again on the same commit re-pushes the tag and Terraform shows no changes.
