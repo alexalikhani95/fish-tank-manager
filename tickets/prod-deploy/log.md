@@ -25,3 +25,4 @@ built 04 (agent part, keeper deploy pending) c1e769e
 VERDICT review-04 blockers=0 total=6 file=tickets/prod-deploy/checks/review-04.md
 review 04 · opus · 76570
 fix 04 review · sonnet · 52236
+deploy 04 · main session · keeper-requested · smoke ok ef55ea4
