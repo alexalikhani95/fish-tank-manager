@@ -257,7 +257,7 @@ One flat Terraform root, `infra/prod/main.tf` (ADR-0012): no modules until stagi
 | CloudFront            | default `*.cloudfront.net` certificate, HTTP → HTTPS redirect, `PriceClass_100`, `default_root_object = index.html`. Default behaviour → PWA bucket, managed CachingOptimized, GET/HEAD, CloudFront Function `fishtank-spa-rewrite` (viewer request: a path with no file extension becomes `/index.html`). `/api/*` → function URL host (HTTPS only), managed CachingDisabled + AllViewerExceptHostHeader (Cookie and query forwarded, not `Host`, which the function URL rejects; a Bearer header through CloudFront on GET is not verified), all methods. **No custom error responses**: they apply to every behaviour and would turn the API's 401/404 JSON into HTML. Not a security boundary: the function URL stays public (ADR-0012) |
 | Outputs               | `ecr_repository_url`, `function_name`, `function_url`, `cloudfront_url`, `distribution_id`, `pwa_bucket`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
-**Lambda environment.** Plain: `NODE_ENV=production`, `HOST=0.0.0.0`, `PORT=8080`, `LOG_LEVEL=info`, `TZ=UTC`, `AWS_LWA_READINESS_CHECK_PATH=/api/v1/health`, and `APP_URL=https://localhost` — `start/env.ts` requires it but nothing reads it, and the real URL would make a Terraform cycle. Secret: `MONGO_URL`, `APP_KEY`, `JWT_SECRET`, read by `aws_ssm_parameter` data sources from `/fishtank/prod/<NAME>` (step 3 below) and copied into the environment. Plan shows the whole env map as `(sensitive value)`, so a plain-var change is invisible too; the values sit in the state file and the Lambda console (ADR-0012). The parameters must exist before any full plan or apply. `HOST=0.0.0.0` is also the address Lambda Web Adapter dials (deprecated unprefixed `HOST`); Adonis needs it, so do not change it to a specific IP. A Lambda init/invoke timeout usually means a wrong `MONGO_URL` or Atlas access list (Mongo connect waits 30 s, longer than the limits): check CloudWatch.
+**Lambda environment.** Plain: `NODE_ENV=production`, `HOST=0.0.0.0`, `PORT=8080`, `LOG_LEVEL=info`, `TZ=UTC`, `AWS_LWA_READINESS_CHECK_PATH=/api/v1/health`, and `APP_URL=https://localhost` — `start/env.ts` requires it but nothing reads it, and the real URL would make a Terraform cycle. Secret: `MONGO_URL`, `APP_KEY`, `JWT_SECRET`, read by `aws_ssm_parameter` data sources from `/fishtank/prod/<NAME>` (step 3 below) and copied into the environment. Plan shows the whole env map as `(sensitive value)`, so a plain-var change is invisible too; the values sit in the state file and the Lambda console (ADR-0012). The parameters must exist before any full plan or apply. `HOST=0.0.0.0` is also the address Lambda Web Adapter dials (deprecated unprefixed `HOST`); Adonis needs it, so do not change it to a specific IP.
 
 **Terraform ≥ 1.10** (for `use_lockfile`). Homebrew's own `terraform` formula is frozen at 1.5.7: `brew install hashicorp/tap/terraform`.
 
@@ -350,9 +350,9 @@ cd /tmp/fishtank-rollback && npm ci && npm run deploy
 cd - && git worktree remove /tmp/fishtank-rollback
 ```
 
-It rebuilds the image and the PWA from that commit and runs the same smoke check. To go forward again, run `npm run deploy` from the branch head. Infra changes since that commit are rolled back too: read the plan. Roll back only to commits at or after fbf2097; if the plan destroys `aws_cloudfront_distribution.app` or `aws_s3_bucket.pwa`, answer no.
+It rebuilds the image and the PWA from that commit and runs the same smoke check. To go forward again, run `npm run deploy` from the branch head. Deploy from `main` after merge, so the live SHA is on `main`. Infra changes since that commit are rolled back too: read the plan. Roll back only to the squash commit of PR #12 (or later) on `main`; if the plan destroys `aws_cloudfront_distribution.app` or `aws_s3_bucket.pwa`, answer no.
 
-**Troubleshooting.** A 5xx through CloudFront on `/api/*` is usually the Lambda failing to boot: its init is capped at 10 s and Mongo connects at boot, so a wrong `MONGO_URL` or Atlas access list shows up here. Read the log group `/aws/lambda/fishtank-api`: `aws logs tail /aws/lambda/fishtank-api --region eu-west-2 --since 1h` (add `--follow` to watch a retry). A 403 on `/api/*` means the function URL permissions (Infra layout above); a 403 on a page means the file is not in the bucket.
+**Troubleshooting.** A 5xx through CloudFront on `/api/*` is usually the Lambda failing to boot: its init is capped at 10 s and Mongo connects at boot, so a wrong `MONGO_URL` or Atlas access list shows up here (Mongo connect waits 30 s, longer than the limits). Read the log group `/aws/lambda/fishtank-api`: `aws logs tail /aws/lambda/fishtank-api --region eu-west-2 --since 1h` (add `--follow` to watch a retry). A 403 on `/api/*` means the function URL permissions (Infra layout above); a 403 on a page means the file is not in the bucket.
 
 ### Manual backup
 
@@ -366,4 +366,14 @@ mongodump --uri "$MONGO_URL" --archive="fishtank_prod-$(date +%F).gz" --gzip
 unset MONGO_URL
 ```
 
-The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed. Restore with `mongorestore --uri "$MONGO_URL" --archive=<file> --gzip`; it adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.
+The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed.
+
+Restore: fetch `MONGO_URL` again, then run `mongorestore`:
+
+```sh
+MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL   --with-decryption --query Parameter.Value --output text)"
+mongorestore --uri "$MONGO_URL" --archive=<file> --gzip
+unset MONGO_URL
+```
+
+It adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.
