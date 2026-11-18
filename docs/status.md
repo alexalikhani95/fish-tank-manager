@@ -9,7 +9,7 @@
 | Environment | State       | URL                                   | Deployed SHA | Last verified |
 | ----------- | ----------- | ------------------------------------- | ------------ | ------------- |
 | staging     | not created | —                                     | —            | —             |
-| prod        | deployed    | https://d2xxyedlkkg5qo.cloudfront.net | `ef55ea4`    | 2026-11-18    |
+| prod        | deployed    | https://d2xxyedlkkg5qo.cloudfront.net | `5c1cf41`    | 2026-11-18    |
 
 ## Infrastructure
 
@@ -38,6 +38,7 @@
 | Deploy of `ef55ea4` | `npm run deploy` from the laptop; full smoke check passed                          | 2026-11-16    |
 | Sign-up closed      | the keeper signed up; `POST /api/v1/auth/register` returns 403 "Sign-up is closed" | 2026-11-18    |
 | Keeper on the phone | installed the PWA, added a Tank, logged a WaterChange, cold-opened and saw it      | 2026-11-18    |
+| Deploy of `5c1cf41` | `npm run deploy` from `main` after PR #12 merged; full smoke check passed          | 2026-11-18    |
 | Rollback drill      | not done                                                                           | —             |
 | Backups             | manual `mongodump` only (runbook in `lld.md`); not yet run                         | —             |
 
