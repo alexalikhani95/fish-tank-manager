@@ -19,7 +19,7 @@ Agent:
 
 Keeper:
 
-- [ ] Runs `npm run deploy`, reads the plan, types `yes`; smoke check output pasted into `## Comments` — then signs up on the phone straight away (ADR-0010)
+- [x] Runs `npm run deploy`, reads the plan, types `yes`; smoke check output pasted into `## Comments` — then signs up on the phone straight away (ADR-0010)
 - [ ] Rollback once: deploys the previous commit from a throwaway worktree, smoke check passes, then redeploys the branch head
 
 ## Comments
@@ -32,3 +32,5 @@ Keeper:
 - **The first apply waits for the distribution** to deploy (several minutes); the deploy also waits for the `/*` invalidation before the smoke check.
 
 - 2026-11-16 (agent, at the keeper's request): ran `npm run deploy` of `ef55ea4`. Plan checked first (**6 to add, 1 to change, 0 to destroy**, as reviewed), then answered yes. Apply **6 added, 1 changed, 0 destroyed**; PWA uploaded; invalidation done; full smoke check passed: `✓ deployed ef55ea4ad51eb8091ee1f661d74c063cf29d2e30: https://d2xxyedlkkg5qo.cloudfront.net`. Distribution `E3I8A4K1FKGUHF`, bucket `fishtank-pwa-107014414355`. Still open: the keeper's phone sign-up (ADR-0010) and the rollback drill.
+
+- 2026-11-18 (keeper): signed up on the phone. `POST /api/v1/auth/register` now returns `403 {"errors":[{"field":"","message":"Sign-up is closed"}]}` (ADR-0010).
