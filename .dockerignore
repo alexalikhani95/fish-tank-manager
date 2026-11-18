@@ -1,0 +1,21 @@
+# Build context is the repo root. Keep every workspace's package.json (npm ci
+# needs them) and drop everything else the API image doesn't use.
+**/node_modules
+**/.env*
+.git
+.github
+.worktrees
+.claude
+.codex
+.githooks
+tickets
+qa
+infra
+docs
+scripts
+*.md
+web/*
+!web/package.json
+app/build
+app/tmp
+app/.adonisjs

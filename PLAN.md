@@ -64,16 +64,16 @@ How these fit together: `docs/design/hld.md`. Data model and API: `docs/design/l
 
 **Goal: production-shaped deployment and monitoring. A copy of `home-manager`'s Phase 3 minus RDS, SQS, and SES.**
 
-- [ ] Terraform modules: Lambda (container image, function URL, reserved concurrency), S3 (frontend bucket + photos bucket) + CloudFront (`/*` → PWA bucket, `/api/*` → function URL, forwarding the `Cookie` header and caching no authenticated response — ADR-0006) — one root per environment (`infra/envs/staging`, `infra/envs/prod`) sharing the same modules
-- [ ] Remote state (S3 backend + DynamoDB lock), separate state key per environment
-- [ ] MongoDB Atlas free M0 cluster; one cluster, two databases (`fishtank_staging`, `fishtank_prod`). **M0 has no automated backups** — losing the prod database loses the log, which is the one thing `PRD.md` → Success criteria depends on
+- [~] Terraform modules — prod only so far: one flat root `infra/prod`, deployed from the laptop (ADR-0012), no modules until staging exists; staging root still open. Lambda (container image, function URL, reserved concurrency), S3 (frontend bucket + photos bucket) + CloudFront (`/*` → PWA bucket, `/api/*` → function URL, forwarding the `Cookie` header and caching no authenticated response — ADR-0006) — one root per environment (`infra/envs/staging`, `infra/envs/prod`) sharing the same modules
+- [~] Remote state — prod done with an S3 backend and the S3 lock file (`use_lockfile`) instead of DynamoDB; staging key still open
+- [~] MongoDB Atlas free M0 cluster — prod database `fishtank_prod` done, `fishtank_staging` still open; one cluster, two databases (`fishtank_staging`, `fishtank_prod`). **M0 has no automated backups** — losing the prod database loses the log, which is the one thing `PRD.md` → Success criteria depends on
 - [ ] Nightly backup: a scheduled GitHub Actions job runs `mongodump` against prod and writes the archive to S3 with a lifecycle rule keeping 30 days. Restore is `mongorestore` from the newest archive; the job fails loudly if the dump is empty
-- [ ] ECR lifecycle rule: keep last 10 images
+- [x] ECR lifecycle rule: keep last 10 images
 - [ ] Both environments stay up — idle Lambda costs nothing, so there is nothing to destroy (ADR-0004)
 - [ ] Make the repo public — decided 2026-09-28, to be done before the deploy pipeline lands (the prod approval gate needs it; see below). Present visibility: `docs/status.md`
 - [ ] Deploy pipeline (see below)
 - [ ] Pino structured logging with request IDs; CloudWatch metrics; Sentry
-- [ ] Secrets via SSM Parameter Store `SecureString` (`MONGO_URL`, `APP_KEY`, JWT secret)
+- [~] Secrets via SSM Parameter Store `SecureString` (`MONGO_URL`, `APP_KEY`, JWT secret) — prod done; staging open
 - [ ] Auth follow-ups: `JWT_SECRET` (at least 32 characters) must be in each environment's secrets before deploy, or the app won't boot. Decide where the keeper runs `user:set-password` — Lambda has no server shell (ADR-0004) and the command needs the full env, so likely a checkout pointed at the environment's `MONGO_URL`
 - [ ] E2E browser tests (Playwright) — a handful of critical flows only (sign up → create tank → log change → log test → see trend). Auth smoke comes forward into Phase 1 in `tickets/first-phone-flow/issues/01-sign-in.md`, extended by later slice tickets. Remaining flows run on PR against a local API + Testcontainers Mongo; later reused as the post-deploy smoke test against staging
 

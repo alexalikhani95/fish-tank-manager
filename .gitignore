@@ -8,3 +8,8 @@ web/playwright-report/
 # Local phone HTTPS certificate and key (lld.md → Phone access) — never commit
 .certs/
 *.pem
+# Terraform — local plugins, state and var files (state lives in S3; lld.md → Prod runbook)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars

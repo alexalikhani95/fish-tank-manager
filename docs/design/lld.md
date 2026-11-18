@@ -238,3 +238,142 @@ POST …/photo { contentType: 'image/jpeg', size: blob.size } → presigned PUT 
 Two problems, one solution. **Size**: a phone photo is 3–8 MB, the dashboard shows it as a tile, and the presigned GET's 1-hour TTL changes the URL often enough that the browser cache keeps missing — so the full original would be re-downloaded repeatedly. **HEIC**: iPhones shoot HEIC, Safari can decode and display it, Chrome and Firefox cannot. iOS often transcodes HEIC to JPEG on upload, but not reliably, so a HEIC that slipped through would render on the keeper's phone and break on a laptop.
 
 Re-encoding fixes size everywhere and makes HEIC a visible failure at pick time (`createImageBitmap` throws → "that format isn't supported, use JPEG") instead of a broken `<img>` weeks later. `heic` is therefore **not** in the allowlist: nothing but JPEG ever reaches S3. A WASM HEIC decoder (`heic2any`, libheif) would make Chrome work too, at a few hundred KB in a mobile-first bundle — rejected for v1.
+
+## Prod runbook
+
+Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `tickets/prod-deploy/spec.md`. Run from the repo root with the AWS CLI logged in to account `107014414355`.
+
+### Infra layout
+
+One flat Terraform root, `infra/prod/main.tf` (ADR-0012): no modules until staging gives them a second user. Region `eu-west-2`. State in the bucket from step 1 below, key `prod/terraform.tfstate`, locked by the S3 lock file. The provider lock file `infra/prod/.terraform.lock.hcl` is committed; `.terraform/`, state and `*.tfvars` are gitignored.
+
+| Resource              | Shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ECR `fishtank-api`    | tags `MUTABLE` (re-deploying a commit re-pushes its tag); lifecycle keeps the last 10 images                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Lambda `fishtank-api` | the ECR image at `:<full commit SHA>` (`image_tag` variable), `arm64`, 1024 MB, 15 s, no reserved concurrency (ADR-0004)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Log group             | `/aws/lambda/fishtank-api`, 14 days; the execution role can only write to it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Function URL          | auth `NONE`, plus two explicit `aws_lambda_permission`s (statement IDs `PublicFunctionUrl`: `lambda:InvokeFunctionUrl`; `PublicInvokeViaFunctionUrl`: `lambda:InvokeFunction` with `InvokedViaFunctionUrl` = true, never without it, or any account can call Invoke directly), both for `*`. They sit beside the provider's own statements (≥ 6.28) so they are tracked in state                                                                                                                                                                                                                                                                                                                                                            |
+| PWA bucket            | `fishtank-pwa-107014414355`, private, public access blocked; its policy lets only this distribution read (OAC). A file a later deploy deleted comes back as **403**, not 404 (no `ListBucket`): accepted, the service worker updates on the next cold open                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| CloudFront            | default `*.cloudfront.net` certificate, HTTP → HTTPS redirect, `PriceClass_100`, `default_root_object = index.html`. Default behaviour → PWA bucket, managed CachingOptimized, GET/HEAD, CloudFront Function `fishtank-spa-rewrite` (viewer request: a path with no file extension becomes `/index.html`). `/api/*` → function URL host (HTTPS only), managed CachingDisabled + AllViewerExceptHostHeader (Cookie and query forwarded, not `Host`, which the function URL rejects; a Bearer header through CloudFront on GET is not verified), all methods. **No custom error responses**: they apply to every behaviour and would turn the API's 401/404 JSON into HTML. Not a security boundary: the function URL stays public (ADR-0012) |
+| Outputs               | `ecr_repository_url`, `function_name`, `function_url`, `cloudfront_url`, `distribution_id`, `pwa_bucket`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+**Lambda environment.** Plain: `NODE_ENV=production`, `HOST=0.0.0.0`, `PORT=8080`, `LOG_LEVEL=info`, `TZ=UTC`, `AWS_LWA_READINESS_CHECK_PATH=/api/v1/health`, and `APP_URL=https://localhost` — `start/env.ts` requires it but nothing reads it, and the real URL would make a Terraform cycle. Secret: `MONGO_URL`, `APP_KEY`, `JWT_SECRET`, read by `aws_ssm_parameter` data sources from `/fishtank/prod/<NAME>` (step 3 below) and copied into the environment. Plan shows the whole env map as `(sensitive value)`, so a plain-var change is invisible too; the values sit in the state file and the Lambda console (ADR-0012). The parameters must exist before any full plan or apply. `HOST=0.0.0.0` is also the address Lambda Web Adapter dials (deprecated unprefixed `HOST`); Adonis needs it, so do not change it to a specific IP.
+
+**Terraform ≥ 1.10** (for `use_lockfile`). Homebrew's own `terraform` formula is frozen at 1.5.7: `brew install hashicorp/tap/terraform`.
+
+### One-off setup
+
+**1. Terraform state bucket** (`eu-west-2`; Terraform cannot create its own state bucket). The name carries the account id so it is globally unique.
+
+```sh
+B=fishtank-tfstate-107014414355; R=eu-west-2
+aws s3api create-bucket --bucket $B --region $R \
+  --create-bucket-configuration LocationConstraint=$R
+aws s3api put-bucket-versioning --bucket $B --region $R --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket $B --region $R --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-public-access-block --bucket $B --region $R --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+```
+
+Check:
+
+```sh
+aws s3api get-bucket-versioning --bucket fishtank-tfstate-107014414355 --region eu-west-2     # Enabled
+aws s3api get-public-access-block --bucket fishtank-tfstate-107014414355 --region eu-west-2   # all four true
+aws s3api get-bucket-encryption --bucket fishtank-tfstate-107014414355 --region eu-west-2     # AES256
+```
+
+Locking uses the S3 lock file (`use_lockfile`), no DynamoDB table.
+
+**2. Atlas M0 cluster** (by hand, in the Atlas web console).
+
+1. Create a project and a **M0 (free)** cluster on AWS in `eu-west-2` (London). If M0 is not offered there, use the nearest region that has it (e.g. `eu-west-1`) and note it in the ticket.
+2. Database Access: add a user with password auth and a custom role of **read and write on database `fishtank_prod` only** (no other database, no admin role). Use a long random password without special characters (`openssl rand -hex 24`), so the URL needs no escaping.
+3. Network Access: add `0.0.0.0/0` (Lambda has no fixed IP; ADR-0004).
+4. Connect → Drivers → copy the connection string. Replace `<db_password>` (angle brackets included) with the password, and put `fishtank_prod` between the `/` and the `?` that are already there (no extra `/`). The trailing `appName=…` is harmless:
+
+```
+mongodb+srv://<user>:<password>@<cluster>.<id>.mongodb.net/fishtank_prod?retryWrites=true&w=majority
+```
+
+**3. Secrets in SSM** (`SecureString`, `eu-west-2`). Terraform only reads these. The values are never printed or written to a file: `read -rs` takes the Atlas string without echoing it, and the two generated ones go straight from the generator into the command.
+
+`APP_KEY` is Adonis's encryption key (`node ace generate:key --show` prints `APP_KEY = <value>`). `JWT_SECRET` signs the login token and the app will not boot if it is under 32 characters; `openssl rand -base64 48` gives 64.
+
+Run the `read` line **on its own** first (paste it, press Enter, paste the connection string, press Enter), then paste the rest. It is zsh; in bash use `read -rsp "Atlas connection string: " MONGO_URL`.
+
+```sh
+read -rs "MONGO_URL?Atlas connection string: "
+```
+
+```sh
+aws ssm put-parameter --region eu-west-2 --type SecureString --name /fishtank/prod/MONGO_URL --value="$MONGO_URL"
+unset MONGO_URL
+
+aws ssm put-parameter --region eu-west-2 --type SecureString --name /fishtank/prod/APP_KEY \
+  --value="$(cd app && node ace generate:key --show 2>/dev/null | sed -n 's/^APP_KEY = //p')"
+
+aws ssm put-parameter --region eu-west-2 --type SecureString --name /fishtank/prod/JWT_SECRET \
+  --value="$(openssl rand -base64 48)"
+```
+
+`--value=` (with `=`) matters: a generated `APP_KEY` can start with `-`, which the CLI would otherwise read as a flag.
+
+Check (names only, no values): `aws ssm get-parameters-by-path --region eu-west-2 --path /fishtank/prod --query 'Parameters[].Name'` lists all three. Without `--region eu-west-2` it looks in your default region and shows `[]`. Do not use `--with-decryption` on screen. To change one later, rerun its command with `--overwrite` (for `MONGO_URL`, rerun the `read` line first: the variable was unset); without `--overwrite` a rerun fails with `ParameterAlreadyExists` and changes nothing. Then deploy (Terraform copies the new value into the Lambda). Rotating `APP_KEY` or `JWT_SECRET` signs the User out.
+
+**4. `terraform init`** — `terraform -chdir=infra/prod init`. The deploy runs it every time, so this is only needed to plan by hand.
+
+### Deploy
+
+`npm run deploy` from a clean tree (it refuses uncommitted changes; the image tag is the full commit SHA):
+
+1. `terraform init`.
+2. `terraform apply -target=aws_ecr_repository.api -auto-approve` (the Lambda cannot exist before its image; the `-target` warning is expected), `docker login` to ECR, then an arm64 build and push (the exact `buildx` flags: `scripts/deploy.sh`; Lambda rejects OCI indexes).
+3. `npm run build:web`, then the full `terraform apply -var image_tag=<sha>`, **interactive**: read the plan, type `yes`. The first one creates the distribution and waits for it to finish rolling out (several minutes).
+4. Uploads `web/dist` to the PWA bucket: `assets/` (content-hashed) with `public, max-age=31536000, immutable`; everything else (`index.html`, `sw.js`, `registerSW.js`, the manifest, icons) with `no-cache`; files no longer in the build are deleted after the new ones are up.
+5. Invalidates `/*` and waits for it.
+6. **Smoke check** through the CloudFront URL; any miss fails the command: `/api/v1/health` 200 JSON with `"database":"connected"` (retried for a cold start), a second call `Miss from cloudfront` (`x-cache`); `/api/v1/me` 401 JSON without a cookie and with `Cookie: token=garbage`; `POST /api/v1/auth/logout` 204 with a `token=` `Set-Cookie` (POST and Set-Cookie pass through; cookie forwarding itself is proven only by the keeper's phone sign-in); `/` and `/tanks/x` 200 HTML; `/manifest.webmanifest` is `application/manifest+json` (the script uploads it with that type); `/index.html` and `/sw.js` carry `no-cache`.
+7. Prints `✓ deployed <sha>: <CloudFront URL>`.
+
+Running it again on the same commit re-pushes the tag and Terraform shows no changes.
+
+**First deploy: sign up on your phone straight away.** Open the printed URL on the phone, sign up, then install it (Add to Home Screen). Sign-up closes once a User exists ([ADR-0010](../adr/0010-sign-up-closes-automatically.md)), so the address is open to anyone until you do.
+
+**Lost the race** (sign-up says it is closed and you never signed up): in Atlas → Browse Collections → `fishtank_prod`, delete that User from `users` and every document whose `userId` is its `_id` (`tanks`, `waterchanges`), then sign up again. `node ace user:set-password` only resets an existing User's password; running it against prod from the laptop needs every variable `start/env.ts` validates, not just `MONGO_URL`.
+
+**Rollback** = deploy an earlier commit. From the repo root:
+
+```sh
+git worktree add /tmp/fishtank-rollback <earlier-sha>
+cd /tmp/fishtank-rollback && npm ci && npm run deploy
+cd - && git worktree remove /tmp/fishtank-rollback
+```
+
+It rebuilds the image and the PWA from that commit and runs the same smoke check. To go forward again, run `npm run deploy` from the branch head. Deploy from `main` after merge, so the live SHA is on `main`. Infra changes since that commit are rolled back too: read the plan. Roll back only to the squash commit of PR #12 (or later) on `main`; if the plan destroys `aws_cloudfront_distribution.app` or `aws_s3_bucket.pwa`, answer no.
+
+**Troubleshooting.** A 5xx through CloudFront on `/api/*` is usually the Lambda failing to boot: its init is capped at 10 s and Mongo connects at boot, so a wrong `MONGO_URL` or Atlas access list shows up here (Mongo connect waits 30 s, longer than the limits). Read the log group `/aws/lambda/fishtank-api`: `aws logs tail /aws/lambda/fishtank-api --region eu-west-2 --since 1h` (add `--follow` to watch a retry). A 403 on `/api/*` means the function URL permissions (Infra layout above); a 403 on a page means the file is not in the bucket.
+
+### Manual backup
+
+Atlas M0 has no automated backups, so until the nightly job exists (`PLAN.md` → Phase 2) dump prod by hand before any risky change. One-off: `brew install mongodb-database-tools`.
+
+Fetch `MONGO_URL` from SSM into the shell without printing it (`--with-decryption` is needed because it is a `SecureString`), dump, then unset it:
+
+```sh
+MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL   --with-decryption --query Parameter.Value --output text)"
+mongodump --uri "$MONGO_URL" --archive="fishtank_prod-$(date +%F).gz" --gzip
+unset MONGO_URL
+```
+
+The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed.
+
+Restore: fetch `MONGO_URL` again, then run `mongorestore`:
+
+```sh
+MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL   --with-decryption --query Parameter.Value --output text)"
+mongorestore --uri "$MONGO_URL" --archive=<file> --gzip
+unset MONGO_URL
+```
+
+It adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.

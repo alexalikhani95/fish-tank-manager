@@ -28,7 +28,7 @@ Alternatives considered:
 - **No destroy rules.** Idle Lambda costs nothing, so staging and prod both stay up. The nightly staging destroy and "prod only for demos" go away.
 - **Cold starts.** The first request after a quiet spell waits about 1–3 seconds while Adonis boots and connects to Mongo. Later requests reuse the warm instance and its Mongo connection.
 - **No VPC.** Lambda runs outside a VPC, so there is no network module and no NAT Gateway. Lambda has no fixed IP and Atlas M0 has no private networking, so Atlas network access is open to `0.0.0.0/0`, protected by credentials and TLS only.
-- **Reserved concurrency is capped** (a handful) so a runaway client cannot open hundreds of Mongo connections against M0's limit or run up invocations.
+- **Reserved concurrency is capped** (a handful) so a runaway client cannot open hundreds of Mongo connections against M0's limit or run up invocations. _On hold (2026-11-14):_ this AWS account's Lambda limit is 10 concurrent runs, and AWS refuses any reservation that leaves fewer than 10 unreserved. Until a limit increase is granted the cap is unset; 10 runs cannot reach M0's 500-connection limit.
 - **Background work runs as an EventBridge schedule** that invokes the same function, not a long-running `ace` process. Phase 3 reminders use this.
 - **Less practice running a server.** ECS, instance patching and capacity are no longer exercised here.
 - **Revisit** if cold starts become annoying in daily use (provisioned concurrency costs money, so the first step is measuring), or if traffic ever leaves the free tier.
