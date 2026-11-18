@@ -10,7 +10,7 @@
 
 Keeper:
 
-- [ ] On the phone (already signed up in 04), installs the PWA from the prod URL, adds a Tank, logs a WaterChange, closes the app, cold-opens it and sees the WaterChange. Result noted in `## Comments`
+- [x] On the phone (already signed up in 04), installs the PWA from the prod URL, adds a Tank, logs a WaterChange, closes the app, cold-opens it and sees the WaterChange. Result noted in `## Comments`
 - [x] `POST /api/v1/auth/register` now refuses (sign-up closed, ADR-0010)
 - [ ] Optional: request an AWS Lambda concurrency limit increase (Service Quotas) so ADR-0004's cap can come back
 
@@ -23,3 +23,4 @@ Agent:
 ## Comments
 
 - 2026-11-18 (keeper): signed up on the phone. `POST /api/v1/auth/register` now returns `403 {"errors":[{"field":"","message":"Sign-up is closed"}]}` (ADR-0010).
+- 2026-11-18 (keeper): installed the PWA from the prod URL on the phone, added a Tank, logged a WaterChange, closed the app, cold-opened it and saw the WaterChange. "all good".
