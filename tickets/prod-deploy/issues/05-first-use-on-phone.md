@@ -4,7 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-human — flip to ready-for-agent when the Keeper items are ticked
+**Status:** done
 
 **Label:** boilerplate · **Test seams:** none (manual phone acceptance) · **Risky:** no
 

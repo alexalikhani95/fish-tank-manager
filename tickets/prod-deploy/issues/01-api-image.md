@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Label:** pattern (standard multi-stage Node Dockerfile; the npm-workspaces lockfile trap is spelled out in the spec) · **Test seams:** `docker run` + `curl` against the health route · **Risky:** no
 

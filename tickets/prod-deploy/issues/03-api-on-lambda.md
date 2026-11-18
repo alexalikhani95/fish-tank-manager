@@ -4,7 +4,7 @@
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-human
+**Status:** done
 
 **Label:** new design · **Test seams:** the deploy's health check against the function URL (the full CloudFront smoke check lands in 04) · **Risky:** yes — infra, secrets (SSM → Lambda env, values in state), a public endpoint
 

@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human — Agent items done; the session waits for the keeper before 03
+**Status:** done
 
 **Label:** boilerplate · **Test seams:** none (checked by `aws` commands) · **Risky:** yes — secrets; the keeper enters every secret value themselves, none passes through an agent or chat
 

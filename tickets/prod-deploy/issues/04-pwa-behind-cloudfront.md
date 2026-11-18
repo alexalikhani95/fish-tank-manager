@@ -4,7 +4,7 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-human — the keeper runs the real deploy
+**Status:** done
 
 **Label:** new design · **Test seams:** the deploy's smoke check through CloudFront (spec step 6) · **Risky:** yes — CloudFront cookie forwarding and caching (ADR-0006: get it wrong and auth breaks or one response is served to another)
 
