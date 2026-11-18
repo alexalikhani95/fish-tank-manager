@@ -16,9 +16,9 @@ Keeper:
 
 Agent:
 
-- [ ] Runbook in `lld.md`: manual `mongodump` backup (with `brew install mongodb-database-tools`), troubleshooting via the Lambda's CloudWatch log group
-- [ ] `docs/status.md`: prod rows (URL, region, Atlas cluster, what was verified and when); `scripts/check-status-claims.sh` passes
-- [ ] `PLAN.md` Phase 2: tick/annotate what this slice did (prod only, S3 lock file not DynamoDB, ECR rule), leaving staging, pipeline and backups open
+- [x] Runbook in `lld.md`: manual `mongodump` backup (with `brew install mongodb-database-tools`), troubleshooting via the Lambda's CloudWatch log group
+- [x] `docs/status.md`: prod rows (URL, region, Atlas cluster, what was verified and when); `scripts/check-status-claims.sh` passes
+- [x] `PLAN.md` Phase 2: tick/annotate what this slice did (prod only, S3 lock file not DynamoDB, ECR rule), leaving staging, pipeline and backups open
 
 ## Comments
 

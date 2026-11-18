@@ -6,16 +6,21 @@
 
 ## Environments
 
-| Environment | State       | URL | Deployed SHA | Last verified |
-| ----------- | ----------- | --- | ------------ | ------------- |
-| staging     | not created | —   | —            | —             |
-| prod        | not created | —   | —            | —             |
+| Environment | State       | URL                                   | Deployed SHA | Last verified |
+| ----------- | ----------- | ------------------------------------- | ------------ | ------------- |
+| staging     | not created | —                                     | —            | —             |
+| prod        | deployed    | https://d2xxyedlkkg5qo.cloudfront.net | `ef55ea4`    | 2026-11-18    |
 
 ## Infrastructure
 
-| Resource    | State   | Notes                                      | Last verified |
-| ----------- | ------- | ------------------------------------------ | ------------- |
-| GitHub repo | created | `alexalikhani95/fish-tank-manager`, public | 2026-10-18    |
+| Resource         | State   | Notes                                                                                   | Last verified |
+| ---------------- | ------- | --------------------------------------------------------------------------------------- | ------------- |
+| GitHub repo      | created | `alexalikhani95/fish-tank-manager`, public                                              | 2026-10-18    |
+| Prod: CloudFront | created | distribution `E3I8A4K1FKGUHF`, serves the PWA and proxies `/api/*`; URL in Environments | 2026-11-16    |
+| Prod: PWA bucket | created | `fishtank-pwa-107014414355`, private, region `eu-west-2`                                | 2026-11-16    |
+| Prod: Lambda     | created | `fishtank-api`, arm64 image from ECR `fishtank-api`                                     | 2026-11-16    |
+| Prod: Atlas      | created | M0 in AWS `eu-west-2`, project `fish-tank-manager`, database `fishtank_prod`            | 2026-11-16    |
+| Prod: secrets    | created | SSM `SecureString` under `/fishtank/prod/*`                                             | 2026-11-16    |
 
 ## Application
 
@@ -25,6 +30,16 @@
 | App             | API scaffolded — AdonisJS 7 + Mongoose, Tanks CRUD, WaterChange create/list, Zod validation, JWT auth (register, login, logout, `me`, `user:set-password`); test counts and frontend verification below                                                                                                                            | 2026-11-08    |
 | CI (PR checks)  | PR workflow verified on Ubuntu 22.04 / MongoDB 8: [run 42413494112](https://github.com/alexalikhani95/fish-tank-manager/actions/runs/42413494112), all six gates pass, 56 application and 15 script tests executed. Main requires PRs and strict `CI checks`, including admins, with zero human approvals; API readback confirmed. | 2026-11-07    |
 | Deploy pipeline | not created                                                                                                                                                                                                                                                                                                                        | 2026-10-18    |
+
+## Prod verification
+
+| Check               | State                                                                              | Last verified |
+| ------------------- | ---------------------------------------------------------------------------------- | ------------- |
+| Deploy of `ef55ea4` | `npm run deploy` from the laptop; full smoke check passed                          | 2026-11-16    |
+| Sign-up closed      | the keeper signed up; `POST /api/v1/auth/register` returns 403 "Sign-up is closed" | 2026-11-18    |
+| Keeper on the phone | installed the PWA, added a Tank, logged a WaterChange, cold-opened and saw it      | 2026-11-18    |
+| Rollback drill      | not done                                                                           | —             |
+| Backups             | manual `mongodump` only (runbook in `lld.md`); not yet run                         | —             |
 
 ## First phone flow — local branch verification
 

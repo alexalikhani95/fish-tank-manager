@@ -241,7 +241,7 @@ Re-encoding fixes size everywhere and makes HEIC a visible failure at pick time 
 
 ## Prod runbook
 
-Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `tickets/prod-deploy/spec.md`. Run from the repo root with the AWS CLI logged in to account `107014414355`. The backup section is added by a later ticket.
+Prod setup, from [ADR-0012](../adr/0012-prod-first-laptop-deploy.md) and `tickets/prod-deploy/spec.md`. Run from the repo root with the AWS CLI logged in to account `107014414355`.
 
 ### Infra layout
 
@@ -352,4 +352,18 @@ cd - && git worktree remove /tmp/fishtank-rollback
 
 It rebuilds the image and the PWA from that commit and runs the same smoke check. To go forward again, run `npm run deploy` from the branch head. Infra changes since that commit are rolled back too: read the plan. Roll back only to commits at or after fbf2097; if the plan destroys `aws_cloudfront_distribution.app` or `aws_s3_bucket.pwa`, answer no.
 
-**Troubleshooting.** A 5xx through CloudFront on `/api/*` is usually the Lambda failing to boot: its init is capped at 10 s and Mongo connects at boot, so a wrong `MONGO_URL` or Atlas access list shows up here. Read the log group `/aws/lambda/fishtank-api`. A 403 on `/api/*` means the function URL permissions (Infra layout above); a 403 on a page means the file is not in the bucket.
+**Troubleshooting.** A 5xx through CloudFront on `/api/*` is usually the Lambda failing to boot: its init is capped at 10 s and Mongo connects at boot, so a wrong `MONGO_URL` or Atlas access list shows up here. Read the log group `/aws/lambda/fishtank-api`: `aws logs tail /aws/lambda/fishtank-api --region eu-west-2 --since 1h` (add `--follow` to watch a retry). A 403 on `/api/*` means the function URL permissions (Infra layout above); a 403 on a page means the file is not in the bucket.
+
+### Manual backup
+
+Atlas M0 has no automated backups, so until the nightly job exists (`PLAN.md` → Phase 2) dump prod by hand before any risky change. One-off: `brew install mongodb-database-tools`.
+
+Fetch `MONGO_URL` from SSM into the shell without printing it (`--with-decryption` is needed because it is a `SecureString`), dump, then unset it:
+
+```sh
+MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL   --with-decryption --query Parameter.Value --output text)"
+mongodump --uri "$MONGO_URL" --archive="fishtank_prod-$(date +%F).gz" --gzip
+unset MONGO_URL
+```
+
+The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed. Restore with `mongorestore --uri "$MONGO_URL" --archive=<file> --gzip`; it adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.
