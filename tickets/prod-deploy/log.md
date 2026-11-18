@@ -32,3 +32,6 @@ built 05 9949e5e
 VERDICT ponytail blockers=0 total=3 file=tickets/prod-deploy/checks/ponytail.md
 ponytail-review · sonnet · 49409 (0 applied, 3 kept with reasons)
 self-check: typecheck ok, lint ok, test 76, test:web 11, scripts 15, status-claims ok
+VERDICT pr-review-1 blockers=0 total=4 file=tickets/prod-deploy/checks/pr-review-1.md
+pr review 1 · opus · 98684
+fix pr review 1 · sonnet · 45594 (F1 F2 F4 fixed 407c7c0; F3 open)
