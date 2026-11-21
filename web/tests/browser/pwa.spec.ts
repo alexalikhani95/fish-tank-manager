@@ -74,7 +74,10 @@ test("installable shell: manifest, worker-served deep links, API pass-through an
   // Offline with data already loaded: it stays visible with the banner.
   await expect(page.getByRole("heading", { name: "Shell Tank" })).toBeVisible();
   await context.setOffline(true);
-  await expect(page.getByRole("status")).toContainText("You’re offline");
+  // The log may still show its own loading status beside the banner.
+  await expect(
+    page.getByRole("status").filter({ hasText: "You’re offline" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Shell Tank" })).toBeVisible();
   // An unavailable API is a failed request, never a successful HTML page.
   expect(
