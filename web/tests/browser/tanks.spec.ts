@@ -85,13 +85,17 @@ test("Add Tank in a UK-gallon preference: field errors, unconfirmed create, Tank
   await expect(page.getByText("10 UK gal", { exact: true })).toBeVisible();
   // Switching straight from one Tank to another never shows the first Tank's data.
   const riverPath = `/tanks/${riverId}`;
+  await expect(page.getByText("No water changes yet.")).toBeVisible();
   await page.evaluate((riverPath) => {
     const w = window as unknown as { leaked: string[] };
     w.leaked = [];
+    // The URL changes before the new route renders (router transitions), so only
+    // count a leak once the second Tank's view has appeared.
+    let newView = false;
     new MutationObserver(() => {
       const shown = document.querySelector("main")?.textContent ?? "";
-      if (location.pathname === riverPath && /UK Tank|10 UK gal/.test(shown))
-        w.leaked.push(shown);
+      if (/Loading Tank…|Second Tank/.test(shown)) newView = true;
+      if (newView && /UK Tank|10 UK gal/.test(shown)) w.leaked.push(shown);
     }).observe(document.body, {
       subtree: true,
       childList: true,
