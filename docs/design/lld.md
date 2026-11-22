@@ -356,24 +356,25 @@ It rebuilds the image and the PWA from that commit and runs the same smoke check
 
 ### Manual backup
 
-Atlas M0 has no automated backups, so until the nightly job exists (`PLAN.md` → Phase 2) dump prod by hand before any risky change. One-off: `brew install mongodb-database-tools`.
+Atlas M0 has no automated backups, so until the nightly job exists (`PLAN.md` → Phase 2) dump prod by hand before any risky change. The Mongo tools run from the `mongo:8` Docker image (the one CI uses), so nothing needs installing; `brew install mongodb-database-tools` is an optional alternative.
 
-Fetch `MONGO_URL` from SSM into the shell without printing it (`--with-decryption` is needed because it is a `SecureString`), dump, then unset it:
+**Dump.** `scripts/backup.sh` with `BACKUP_BUCKET` unset and `OUT` set. It reads `MONGO_URL` from SSM without printing it, dumps, restores the copy into a throwaway `mongo:8` container, checks every collection came back whole, and only then copies the archive to `OUT`:
 
 ```sh
-MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL   --with-decryption --query Parameter.Value --output text)"
-mongodump --uri "$MONGO_URL" --archive="fishtank_prod-$(date +%F).gz" --gzip
-unset MONGO_URL
+OUT=~/fishtank_prod-$(date +%F).gz bash scripts/backup.sh
 ```
+
+It prints the collection names and counts, dumped and restored, and fails if `users`, `tanks` or `waterchanges` is missing or empty, or if any collection restores a different count from the one dumped. Other knobs: `SOURCE_URI` dumps another database instead of prod (for example the dev one through `mongodb://host.docker.internal:27017/fishtank_dev`), and `ARCHIVE=<file>` only re-checks an existing archive. **Adding a collection** (for example WaterTests) means adding it to the script's `REQUIRED` list.
 
 The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed.
 
-Restore: fetch `MONGO_URL` again, then run `mongorestore`:
+**Restore.** Fetch `MONGO_URL` from SSM into the shell without printing it (`--with-decryption` is needed because it is a `SecureString`), pass it to the container by name with `-e` so it stays off the command line, then unset it. Run from the directory that holds the archive:
 
 ```sh
-MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL   --with-decryption --query Parameter.Value --output text)"
-mongorestore --uri "$MONGO_URL" --archive=<file> --gzip
+MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL --with-decryption --query Parameter.Value --output text)"
+docker run --rm -e MONGO_URL -v "$PWD:/backup" mongo:8 \
+  sh -c 'mongorestore --uri "$MONGO_URL" --archive=/backup/<file> --gzip'
 unset MONGO_URL
 ```
 
-It adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.
+With Homebrew's tools instead: `mongorestore --uri "$MONGO_URL" --archive=<file> --gzip`. It adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.
