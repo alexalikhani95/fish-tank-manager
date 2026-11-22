@@ -50,7 +50,8 @@ Its interface, from environment variables:
 
 - `SOURCE_URI`: the database to dump. When unset, the script reads `/fishtank/prod/MONGO_URL` from SSM (`--with-decryption`, region `eu-west-2`).
 - `BACKUP_BUCKET`: where to upload. When unset, the script dumps and verifies but uploads nothing; that is the laptop mode.
-- `ARCHIVE`: an existing archive file. When set, the script skips the dump and only verifies, so a broken file can be tested.
+- `ARCHIVE`: an existing archive file. When set, the script skips the dump and only verifies, so a broken file can be tested. With no dump there are no dumped counts: the database name comes from `mongorestore`'s output, and the check is the required-collections rule, `0 document(s) failed` and zero exits (a truncated file fails `mongorestore`). `ARCHIVE` never uploads, even with `BACKUP_BUCKET` set.
+- `OUT`: a path. When set, the checked archive is copied there before cleanup. This is how the laptop keeps a manual copy.
 
 **Tools:** the script starts its own throwaway `mongo:8` container (`docker run -d --rm`), the same image CI uses, and runs `mongodump`, `mongorestore` and `mongosh` inside it with `docker exec`. The archive goes through a bind-mounted temp directory, and the URI goes in with `-e`, never as a command-line argument. There is no service container and nothing is installed from apt or Homebrew, so CI and the laptop run exactly the same code. A `trap` removes the container and the temp directory on exit.
 
@@ -105,7 +106,7 @@ Its interface, from environment variables:
   1. List the bucket and pick the newest key.
   2. `aws s3 cp` it down.
   3. `mongorestore` as today. The `--drop` warning stays.
-- **Manual dump and restore:** the commands use the `mongo:8` Docker image, so they work without Homebrew. The `brew install` line stays as an optional alternative. The manual dump can simply be the script with `BACKUP_BUCKET` unset.
+- **Manual dump and restore:** the commands use the `mongo:8` Docker image, so they work without Homebrew. The `brew install` line stays as an optional alternative. The manual dump is the script with `BACKUP_BUCKET` unset and `OUT` set.
 - **The 60-day trap:** GitHub disables scheduled workflows in a public repo after 60 days without commits. It emails a warning first. Re-enable from the Actions tab within 30 days of the last good copy, or every copy will have expired.
 - **One-time setup:** check the Actions email notification setting.
 
@@ -114,7 +115,7 @@ Its interface, from environment variables:
 **Docs:**
 
 - `docs/status.md` gets a Backups row (bucket, schedule, last verified run) in the follow-up PR, once a real run has passed.
-- `PLAN.md` Phase 2 ticks the nightly-backup item.
+- `PLAN.md` Phase 2 ticks the nightly-backup item in the follow-up PR, once a real run has passed.
 - `hld.md` gets the backup flow if its deploy picture shows data stores.
 
 ## Testing Decisions
@@ -152,3 +153,7 @@ Staging backups; Atlas paid tiers or Atlas-native snapshots; cross-region or cro
 
 - Spec check 13: nothing proves the failure email actually arrives (only that the setting is on). A deliberate failing run was not added, to keep probe code out of the workflow. Review: is the notification-setting check enough?
 - Spec check 11: `simulate-principal-policy` proves the policy, not S3's own 412 on a second write to the same key. Accepted; the real run proves the happy path.
+
+## Stop 2 decisions
+
+- 2026-11-22: keeper approved the four tickets as written, including the `OUT` env var added after the tickets check and the PLAN.md tick moving to ticket 04's follow-up PR.
