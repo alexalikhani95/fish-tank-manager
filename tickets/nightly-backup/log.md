@@ -35,3 +35,7 @@ VERDICT ponytail blockers=0 total=9 file=tickets/nightly-backup/checks/ponytail.
 ponytail-review · sonnet · 60256
 ponytail apply (6 of 9; 3 kept, spec requires them) · sonnet · 57047
 docs pass: skipped, tickets already updated lld/hld/ADR; status.md + PLAN.md wait for ticket 04 per spec
+PR #16 opened
+VERDICT pr-review-1 blockers=0 total=4 file=tickets/nightly-backup/checks/pr-review-1.md
+pr-review-1 · opus · 107448
+pr-review-1 S2, S3, T1 fixed by session (docs); S1 open for stop 3
