@@ -305,7 +305,8 @@ resource "aws_iam_role" "backup" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = {
-          "token.actions.githubusercontent.com:sub" = "repo:alexalikhani95/fish-tank-manager:ref:refs/heads/main"
+          # ponytail: the ids are in the sub because this repo uses immutable subject claims; a recreated repo or renamed owner cannot match.
+          "token.actions.githubusercontent.com:sub" = "repo:alexalikhani95@44570800/fish-tank-manager@1380354722:ref:refs/heads/main"
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
       }
