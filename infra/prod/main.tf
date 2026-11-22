@@ -251,6 +251,98 @@ resource "aws_cloudfront_distribution" "app" {
   }
 }
 
+# Nightly backup (ADR-0013): private bucket, copies expire after 30 days. No versioning (spec).
+resource "aws_s3_bucket" "backups" {
+  bucket = "fishtank-backups-107014414355"
+}
+
+resource "aws_s3_bucket_public_access_block" "backups" {
+  bucket                  = aws_s3_bucket.backups.id
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "backups" {
+  bucket = aws_s3_bucket.backups.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "backups" {
+  bucket = aws_s3_bucket.backups.id
+  rule {
+    id     = "expire-after-30-days"
+    status = "Enabled"
+    filter {}
+    expiration {
+      days = 30
+    }
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
+# GitHub Actions logs in with OIDC; no AWS key lives in GitHub (ADR-0013).
+resource "aws_iam_openid_connect_provider" "github" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+}
+
+# Any workflow on main of this repo (ADR-0013). No `environment:` in the workflow: it changes `sub`.
+resource "aws_iam_role" "backup" {
+  name = "fishtank-backup"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:sub" = "repo:alexalikhani95/fish-tank-manager:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+# Add-only: PutObject only with If-None-Match, so S3 refuses an overwrite (412). No Get, List or
+# Delete. No kms:Decrypt: MONGO_URL uses the AWS-managed alias/aws/ssm key.
+resource "aws_iam_role_policy" "backup" {
+  role = aws_iam_role.backup.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.backups.arn}/*"
+        Condition = { Null = { "s3:if-none-match" = "false" } }
+      },
+      {
+        Effect   = "Allow"
+        Action   = "ssm:GetParameter"
+        Resource = data.aws_ssm_parameter.secret["MONGO_URL"].arn
+      },
+    ]
+  })
+}
+
+output "backup_bucket" {
+  value = aws_s3_bucket.backups.bucket
+}
+
+output "backup_role_arn" {
+  value = aws_iam_role.backup.arn
+}
+
 output "cloudfront_url" {
   value = "https://${aws_cloudfront_distribution.app.domain_name}"
 }
