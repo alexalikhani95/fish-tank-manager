@@ -29,28 +29,45 @@ reason() {
   s=${s#*$'\t'}
   if [ -n "${SOURCE_URI:-}" ]; then s=${s//"$SOURCE_URI"/***}; fi
   if [ -n "${PASSWORD:-}" ]; then s=${s//"$PASSWORD"/***}; fi
+  if [ -n "${PASSWORD_DEC:-}" ]; then s=${s//"$PASSWORD_DEC"/***}; fi
   printf '%s' "$s"
+}
+# mask VALUE: register VALUE as a GitHub log mask. The runner un-escapes the data, so escape it first.
+mask() {
+  local m=$1
+  m=${m//"%"/%25}
+  m=${m//$'\r'/%0D}
+  m=${m//$'\n'/%0A}
+  echo "::add-mask::$m"
 }
 # count NAME LIST: the count for NAME in a "name count" per line LIST, or nothing.
 count() { printf '%s\n' "$2" | awk -v n="$1" '$1 == n { print $2 }'; }
 
 command -v docker >/dev/null || fail "docker is not installed"
+if [ -n "${OUT:-}" ] && [ -d "$OUT" ]; then fail "OUT is a directory: $OUT"; fi
 
 # 1. The source URI (not needed to verify an existing ARCHIVE).
 PASSWORD=
+PASSWORD_DEC=
 if [ -z "${ARCHIVE:-}" ]; then
   if [ -z "${SOURCE_URI:-}" ]; then
     SOURCE_URI=$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL \
       --with-decryption --query Parameter.Value --output text) ||
       fail "could not read /fishtank/prod/MONGO_URL from SSM"
   fi
-  # The password: the text between "user:" and "@" (URL-encoded, so it holds no raw @).
+  # The password: the text between "user:" and "@" (URL-encoded, so it holds no raw @), and its
+  # percent-decoded form, which a tool may print instead.
   userinfo=${SOURCE_URI#*://}
   userinfo=${userinfo%%@*}
   if [ "$userinfo" != "${SOURCE_URI#*://}" ] && [[ $userinfo == *:* ]]; then PASSWORD=${userinfo#*:}; fi
+  if [ -n "$PASSWORD" ]; then
+    PASSWORD_DEC=${PASSWORD//\\/\\\\}
+    PASSWORD_DEC=$(printf '%b' "${PASSWORD_DEC//"%"/\\x}")
+  fi
   if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-    echo "::add-mask::$SOURCE_URI"
-    if [ -n "$PASSWORD" ]; then echo "::add-mask::$PASSWORD"; fi
+    mask "$SOURCE_URI"
+    if [ -n "$PASSWORD" ]; then mask "$PASSWORD"; fi
+    if [ -n "$PASSWORD_DEC" ]; then mask "$PASSWORD_DEC"; fi
   fi
   # The URI reaches mongodump through a YAML config file inside the container, never argv.
   [[ $SOURCE_URI != *"'"* ]] || fail "SOURCE_URI contains a single quote"
@@ -133,12 +150,14 @@ if [ -n "$DUMPED" ]; then
     r=$(count "$name" "$RESTORED")
     [ "$r" = "$n" ] || fail "$name: dumped $n, restored ${r:-none}"
   done <<<"$DUMPED"
+  [ "$(printf '%s\n' "$DUMPED" | awk '{ print $1 }' | sort)" = "$(printf '%s\n' "$RESTORED" | awk '{ print $1 }' | sort)" ] ||
+    fail "the restored collections differ from the dumped ones"
 fi
 echo "✓ backup: the copy restores whole"
 
 # 6. Keep and upload, only after the check passed.
 if [ -n "${OUT:-}" ]; then
-  cp "$TMP/archive.gz" "$OUT"
+  (umask 077 && cp "$TMP/archive.gz" "$OUT")
   chmod 600 "$OUT"
   echo "saved to $OUT"
 fi

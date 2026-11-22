@@ -368,12 +368,13 @@ It prints the collection names and counts, dumped and restored, and fails if `us
 
 The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed.
 
-**Restore.** Fetch `MONGO_URL` from SSM into the shell without printing it (`--with-decryption` is needed because it is a `SecureString`), pass it to the container by name with `-e` so it stays off the command line, then unset it. Run from the directory that holds the archive:
+**Restore.** Fetch `MONGO_URL` from SSM into the shell without printing it (`--with-decryption` is needed because it is a `SecureString`), pass it to the container by name with `-e`, and have `mongorestore` read it from a config file inside the container, so it is never in any process's arguments, then unset it. Run from the directory that holds the archive:
 
 ```sh
 MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL --with-decryption --query Parameter.Value --output text)"
 docker run --rm -e MONGO_URL -v "$PWD:/backup" mongo:8 \
-  sh -c 'mongorestore --uri "$MONGO_URL" --archive=/backup/<file> --gzip'
+  sh -c 'printf "uri: '\''%s'\''\n" "$MONGO_URL" > /tmp/uri.yaml
+    mongorestore --config=/tmp/uri.yaml --archive=/backup/<file> --gzip'
 unset MONGO_URL
 ```
 
