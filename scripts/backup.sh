@@ -157,6 +157,7 @@ echo "✓ backup: the copy restores whole"
 
 # 6. Keep and upload, only after the check passed.
 if [ -n "${OUT:-}" ]; then
+  rm -f "$OUT"
   (umask 077 && cp "$TMP/archive.gz" "$OUT")
   chmod 600 "$OUT"
   echo "saved to $OUT"

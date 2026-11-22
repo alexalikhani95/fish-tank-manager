@@ -364,7 +364,7 @@ Atlas M0 has no automated backups, so until the nightly job exists (`PLAN.md` â†
 OUT=~/fishtank_prod-$(date +%F).gz bash scripts/backup.sh
 ```
 
-It prints the collection names and counts, dumped and restored, and fails if `users`, `tanks` or `waterchanges` is missing or empty, or if any collection restores a different count from the one dumped. Other knobs: `SOURCE_URI` dumps another database instead of prod (for example the dev one through `mongodb://host.docker.internal:27017/fishtank_dev`), and `ARCHIVE=<file>` only re-checks an existing archive. **Adding a collection** (for example WaterTests) means adding it to the script's `REQUIRED` list.
+It prints the collection names and counts, dumped and restored, and fails if `users`, `tanks` or `waterchanges` is missing or empty, if any collection restores a different count from the one dumped, or if the restored collection set differs from the dumped one. Other knobs: `SOURCE_URI` dumps another database instead of prod (for example the dev one through `mongodb://host.docker.internal:27017/fishtank_dev`), and `ARCHIVE=<file>` only re-checks an existing archive. **Adding a collection** (for example WaterTests) means adding it to the script's `REQUIRED` list.
 
 The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed.
 
@@ -373,9 +373,9 @@ The archive holds every User's data and the password hash: keep it out of the re
 ```sh
 MONGO_URL="$(aws ssm get-parameter --region eu-west-2 --name /fishtank/prod/MONGO_URL --with-decryption --query Parameter.Value --output text)"
 docker run --rm -e MONGO_URL -v "$PWD:/backup" mongo:8 \
-  sh -c 'printf "uri: '\''%s'\''\n" "$MONGO_URL" > /tmp/uri.yaml
+  sh -c 'umask 077; printf "uri: '\''%s'\''\n" "$MONGO_URL" > /tmp/uri.yaml
     mongorestore --config=/tmp/uri.yaml --archive=/backup/<file> --gzip'
 unset MONGO_URL
 ```
 
-With Homebrew's tools instead: `mongorestore --uri "$MONGO_URL" --archive=<file> --gzip`. It adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.
+A URI holding `'` breaks that YAML (and the parse error may echo it), so handle such a URI by hand. With Homebrew's tools instead: `mongorestore --uri "$MONGO_URL" --archive=<file> --gzip`, which puts the URI in the arguments of a process on your Mac, visible to local `ps` while it runs. It adds documents and skips ones whose `_id` already exists, so restoring over live data needs `--drop`, which wipes each collection first: only with a backup of what you are about to overwrite.
