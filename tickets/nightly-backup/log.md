@@ -25,3 +25,8 @@ VERDICT review-02-rereview blockers=0 total=1 file=tickets/nightly-backup/checks
 re-review 02 · opus · 69870
 built 02 5576227
 built 03 ec2ef2f
+build 03 · sonnet · 58296
+VERDICT review-03 blockers=0 total=6 file=tickets/nightly-backup/checks/review-03.md
+review 03 · opus · 68977
+fix review-03 1,3,4,5 · sonnet · 47720
+built 03 ccf04c4 (fixes; review-03 2 and 6 go to stop 3)
