@@ -30,3 +30,8 @@ VERDICT review-03 blockers=0 total=6 file=tickets/nightly-backup/checks/review-0
 review 03 · opus · 68977
 fix review-03 1,3,4,5 · sonnet · 47720
 built 03 ccf04c4 (fixes; review-03 2 and 6 go to stop 3)
+self-check: typecheck, lint, 76/76 tests, status-claims green
+VERDICT ponytail blockers=0 total=9 file=tickets/nightly-backup/checks/ponytail.md
+ponytail-review · sonnet · 60256
+ponytail apply (6 of 9; 3 kept, spec requires them) · sonnet · 57047
+docs pass: skipped, tickets already updated lld/hld/ADR; status.md + PLAN.md wait for ticket 04 per spec
