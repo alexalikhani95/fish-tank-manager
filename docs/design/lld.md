@@ -359,17 +359,17 @@ It rebuilds the image and the PWA from that commit and runs the same smoke check
 
 ### Nightly backup
 
-`.github/workflows/backup.yml` runs `scripts/backup.sh` every night at 03:17 UTC and on demand. It logs in to AWS through the `fishtank-backup` role (Infra layout above), then the script dumps prod, proves the copy restores, and uploads it as `fishtank_prod/<UTC timestamp>.gz` to the backup bucket. Copies expire after 30 days. The role ARN and bucket name are written into the workflow as plain values: change them there if the Terraform outputs change. Run it by hand with `gh workflow run backup.yml --ref main`; it only works from `main`, since the role trusts nothing else.
+`.github/workflows/backup.yml` runs `scripts/backup.sh` every night at 03:17 UTC and on demand. It logs in to AWS through the `fishtank-backup` role (Infra layout above), then the script dumps prod, proves the copy restores, and uploads it as `fishtank_prod/<UTC timestamp>.gz` to the backup bucket. Copies expire per Infra layout → Backup bucket. The role ARN and bucket name are written into the workflow as plain values: change them there if the Terraform outputs change. Run it by hand with `gh workflow run backup.yml --ref main`; it only works from `main`, since the role trusts nothing else.
 
 **Restore from the newest copy.** With your own AWS credentials (the backup role cannot list or read), find the newest key, download it, then restore with the command under Manual backup → Restore, using the downloaded file as `<file>` (mind its `--drop` warning):
 
 ```sh
-B=fishtank-backups-107014414355
+B=$(terraform -chdir=infra/prod output -raw backup_bucket)
 KEY=$(aws s3api list-objects-v2 --bucket "$B" --prefix fishtank_prod/ --query 'sort_by(Contents,&Key)[-1].Key' --output text)
 aws s3 cp "s3://$B/$KEY" .
 ```
 
-Keys sort by time, so the last one is the newest.
+Keys sort by time, so the last one is the newest. No key, or `None`, means no copies are left: see the 60-day trap.
 
 **The 60-day trap.** GitHub disables scheduled workflows in a public repo after 60 days without commits, and emails a warning first. Re-enable it from the Actions tab within 30 days of the last good copy, or every copy will have expired.
 
@@ -377,7 +377,7 @@ Keys sort by time, so the last one is the newest.
 
 ### Manual backup
 
-Atlas M0 has no automated backups. The nightly job (below) covers the routine; dump prod by hand before any risky change. The Mongo tools run from the `mongo:8` Docker image (the one CI uses), so nothing needs installing; `brew install mongodb-database-tools` is an optional alternative.
+Atlas M0 has no automated backups. The nightly job (Nightly backup, above) covers the routine; dump prod by hand before any risky change. The Mongo tools run from the `mongo:8` Docker image (the one CI uses), so nothing needs installing; `brew install mongodb-database-tools` is an optional alternative.
 
 **Dump.** `scripts/backup.sh` with `BACKUP_BUCKET` unset and `OUT` set. It reads `MONGO_URL` from SSM without printing it, dumps, restores the copy into a throwaway `mongo:8` container, checks every collection came back whole, and only then copies the archive to `OUT`:
 
