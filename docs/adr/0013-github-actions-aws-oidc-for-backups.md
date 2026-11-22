@@ -9,7 +9,7 @@ The prod database is an Atlas M0 cluster with no backups (ADR-0012 → Consequen
 
 ## Decision
 
-We will let GitHub Actions log in to AWS with **OIDC**: an IAM OpenID Connect provider for GitHub and one narrow role per purpose. The first and only role is for the nightly backup. It is trusted for any workflow on `main` of this repository (kept simple: one `sub` for the whole repo rather than a custom claim with `job_workflow_ref`). The trust matches the immutable `sub` form this repo uses, which includes the owner and repo ids; the exact string is in `lld.md` → Backup role, and it can only read `/fishtank/prod/MONGO_URL` and add new objects to the backup bucket, never overwrite, read or delete them.
+We will let GitHub Actions log in to AWS with **OIDC**: an IAM OpenID Connect provider for GitHub and one narrow role per purpose. The first and only role is for the nightly backup. It is trusted for any workflow on `main` of this repository (kept simple: one `sub` for the whole repo rather than a custom claim with `job_workflow_ref`). The trust matches the immutable `sub` form this repo uses, which includes the owner and repo ids; the exact string is in `lld.md` → Backup role. It can only read `/fishtank/prod/MONGO_URL` and add new objects to the backup bucket, never overwrite, read or delete them.
 
 Rejected:
 
