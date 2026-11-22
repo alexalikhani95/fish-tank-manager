@@ -1,0 +1,29 @@
+name: Nightly backup
+
+# Spec: tickets/nightly-backup/spec.md. Runbook: docs/design/lld.md -> Nightly backup.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# The AWS role trusts only this repo's main branch (ADR-0013): do not add `environment:`, it changes the OIDC sub.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  backup:
+    name: Back up prod
+    # shortcut: MongoDB rejects Linux >=6.19; revisit when supported or before runner retirement.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::107014414355:role/fishtank-backup
+          aws-region: eu-west-2
+      - name: Dump, check and upload
+        env:
+          BACKUP_BUCKET: fishtank-backups-107014414355
+        run: bash scripts/backup.sh
