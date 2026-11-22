@@ -17,3 +17,10 @@ VERDICT review-01-rereview blockers=0 total=5 file=tickets/nightly-backup/checks
 re-review 01 · opus · 66567
 fix review-01 R1-R3,R5 · sonnet · 49726
 built 01 638878a
+build 02 · opus · 70646
+VERDICT review-02 blockers=1 total=3 file=tickets/nightly-backup/checks/review-02.md
+review 02 · opus · 57172
+fix review-02 · sonnet · 48441
+VERDICT review-02-rereview blockers=0 total=1 file=tickets/nightly-backup/checks/review-02.md
+re-review 02 · opus · 69870
+built 02 5576227

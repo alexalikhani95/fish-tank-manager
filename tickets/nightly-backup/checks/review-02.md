@@ -50,3 +50,33 @@ The outputs `backup_bucket` (bucket name) and `backup_role_arn` are added, and t
 ## Summary
 
 1 blocker (F2), 0 important, 2 minor (F1, F4). Everything else passes.
+
+## Re-review (5576227, 66ce7e0)
+
+Read-only. I made no AWS calls. The only outside call was `gh api` (a GitHub read) to confirm the subject prefix again.
+
+### F2 — fixed
+
+In `infra/prod/main.tf:309`, `token.actions.githubusercontent.com:sub` is now `repo:alexalikhani95@44570800/fish-tank-manager@1380354722:ref:refs/heads/main`. That is exactly the `sub_claim_prefix` from `gh api repos/alexalikhani95/fish-tank-manager/actions/oidc/customization/sub` (`repo:alexalikhani95@44570800/fish-tank-manager@1380354722`, `use_immutable_subject: true`, checked again just now) followed by `:ref:refs/heads/main`. The match is still `StringEquals`, with no wildcard and no `StringLike`. `aud` is unchanged, and so are the Federated principal and the `sts:AssumeRoleWithWebIdentity` action. The same string is now in spec.md, ticket 02, and the lld.md Backup role row. Before apply, ticket 04 should still decode one real token's `sub`.
+
+### F1 — fixed
+
+lld.md:260 now says the upload must stay a single `s3api put-object --if-none-match '*'`, because multipart (`aws s3 cp`) is denied. spec.md → Discovered says the same.
+
+### F4 — fixed
+
+ADR-0013 Consequences gained a new line: "Never give `id-token: write` to a `pull_request_target` or `workflow_run` workflow…". ADR-0013 is still Proposed.
+
+### Scope — passes
+
+The `5576227` diff to `infra/prod/main.tf` is 1 line changed and 1 comment line added, both inside `aws_iam_role.backup`. Nothing else in `main.tf` changed. Other than the Backup role `sub` and the F1 sentence, the lld.md diff is whitespace only: the table was re-padded, which `git diff -w --word-diff` confirms. Infra is still in its own commit.
+
+### R1 — minor — the old sub string survives in an earlier check file
+
+`tickets/nightly-backup/checks/spec.md:20` still says the default `sub` is `repo:alexalikhani95/fish-tank-manager:ref:refs/heads/main`, "so the trust works as written". That is now known to be wrong for this repo. It is a historical check record, so do not rewrite it. Add a one-line note under it pointing to review-02 F2, so nobody copies the old string into a later role, such as the deploy role.
+
+Nit, not counted: the new comment in `main.tf` starts with `ponytail:`. That tag marks deferred shortcuts, and this is a fact, not a shortcut, so `/ponytail-debt` will list it by mistake. Drop the prefix.
+
+### Re-review summary
+
+0 blockers, 0 important, 1 minor (R1). F1, F2 and F4 are fixed.

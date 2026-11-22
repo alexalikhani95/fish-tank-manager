@@ -19,6 +19,8 @@ Fix: name the required collections by their real Mongo names (check `app/` model
 
 For `schedule` and for `workflow_dispatch` on `main`, the default `sub` is `repo:alexalikhani95/fish-tank-manager:ref:refs/heads/main`, so the trust works as written. Two caveats the spec should state:
 
+> Later: wrong for this repo. It uses immutable subject claims, so the real `sub` includes owner and repo ids. See checks/review-02.md F2 and spec.md → Discovered.
+
 - If the job ever sets `environment:`, the `sub` becomes `repo:…:environment:<name>` and the assume fails. Say "no `environment:`" (or trust that form instead).
 - The condition admits **any** workflow on `main`, including CI's `workflow_dispatch` and any future workflow, not only the backup job. ADR-0013 says "one role per job", but `sub` cannot bind a role to a workflow file (that needs a custom `sub` template with `job_workflow_ref`). Either accept this and change the ADR wording to "one role per purpose, any workflow on main", or add a `job_workflow_ref` condition. Use `StringEquals`, not `StringLike`.
 
