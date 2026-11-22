@@ -385,7 +385,7 @@ Atlas M0 has no automated backups. The nightly job (Nightly backup, above) cover
 OUT=~/fishtank_prod-$(date +%F).gz bash scripts/backup.sh
 ```
 
-It prints the collection names and counts, dumped and restored, and fails if `users`, `tanks` or `waterchanges` is missing or empty, if any collection restores a different count from the one dumped, or if the restored collection set differs from the dumped one. Other knobs: `SOURCE_URI` dumps another database instead of prod (for example the dev one through `mongodb://host.docker.internal:27017/fishtank_dev`), and `ARCHIVE=<file>` only re-checks an existing archive. **Adding a collection** (for example WaterTests) means adding it to the script's `REQUIRED` list.
+It prints the collection names and restored counts, and fails if `users`, `tanks` or `waterchanges` is missing or empty, if any collection restores a different count from the one dumped, or if the restored collection set differs from the dumped one. Other knobs: `SOURCE_URI` dumps another database instead of prod (for example the dev one through `mongodb://host.docker.internal:27017/fishtank_dev`), and `ARCHIVE=<file>` only re-checks an existing archive. **Adding a collection** (for example WaterTests) means adding it to the script's `REQUIRED` list.
 
 The archive holds every User's data and the password hash: keep it out of the repo (outside the working tree, or under a gitignored path) and delete it when no longer needed.
 

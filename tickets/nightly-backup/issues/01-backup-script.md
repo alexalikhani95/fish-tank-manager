@@ -116,3 +116,27 @@ exit 1
 ```
 
 Typecheck, lint, `npm test` (76 passed) and `bash scripts/check-status-claims.sh` green.
+
+### Ponytail pass
+
+Applied from `checks/ponytail.md`: removed `chmod 600 "$OUT"`, the "BACKUP_BUCKET is ignored" echo; one ping loop; `one_db` helper for the one-database check; the counts table prints once (restored only; the dumped-vs-restored comparison stays in the check loop, so `lld.md` now says "restored counts"). Removed the hld.md "Backup:" bullet. Not applied (spec requires): `backup_role_arn` output, `abort_incomplete_multipart_upload`, Homebrew alternatives.
+
+Runs against the dev MongoDB via host.docker.internal (scratch dbs dropped after):
+
+```
+$ bash -n scripts/backup.sh          -> ok
+$ SOURCE_URI=.../backup_check_good OUT=<scratch>/good.gz bash scripts/backup.sh
+database backup_check_good
+  users 1, waterchanges 3, tanks 2
+✓ backup: the copy restores whole
+saved to <scratch>/good.gz           exit 0, OUT mode 600
+
+$ ARCHIVE=<scratch>/good.gz bash scripts/backup.sh
+✓ backup: the copy restores whole    exit 0
+
+$ SOURCE_URI=.../backup_check_nowc bash scripts/backup.sh
+✗ backup: required collection waterchanges is missing or empty in the dump    exit 1
+
+$ ARCHIVE=<truncated 100 bytes> bash scripts/backup.sh
+✗ backup: mongorestore failed: Failed: I/O failure reading beginning of archive: unexpected EOF    exit 1
+```

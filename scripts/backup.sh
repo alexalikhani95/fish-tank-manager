@@ -40,6 +40,8 @@ mask() {
   m=${m//$'\n'/%0A}
   echo "::add-mask::$m"
 }
+# one_db LIST WHAT: fail unless the database names in LIST are exactly one.
+one_db() { [ "$(printf '%s\n' "$1" | wc -l)" -eq 1 ] || fail "$2 holds more than one database: $(echo $1)"; }
 # count NAME LIST: the count for NAME in a "name count" per line LIST, or nothing.
 count() { printf '%s\n' "$2" | awk -v n="$1" '$1 == n { print $2 }'; }
 
@@ -100,20 +102,19 @@ if [ -z "${ARCHIVE:-}" ]; then
     sed -nE 's/.*done dumping `?([^.`[:space:]]+)\.([^`[:space:]]+)`? \(([0-9]+) documents?\).*/\1 \2 \3/p')
   [ -n "$DUMPED" ] || fail "mongodump reported no collections (is the database empty or the name wrong?)"
   DB=$(printf '%s\n' "$DUMPED" | awk '{ print $1 }' | sort -u)
-  [ "$(printf '%s\n' "$DB" | wc -l)" -eq 1 ] || fail "the dump holds more than one database: $(echo $DB)"
+  one_db "$DB" "the dump"
   DUMPED=$(printf '%s\n' "$DUMPED" | awk '{ print $2, $3 }')
 else
   cp "$ARCHIVE" "$TMP/archive.gz"
-  if [ -n "${BACKUP_BUCKET:-}" ]; then echo "ARCHIVE mode verifies only; BACKUP_BUCKET is ignored"; fi
 fi
 
 # 4. Restore into the throwaway mongod, under the same database name, once it answers a ping.
+ok=
 for _ in $(seq 1 30); do
-  if docker exec "$C" mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then break; fi
+  if docker exec "$C" mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then ok=1; break; fi
   sleep 1
 done
-docker exec "$C" mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1 ||
-  fail "the throwaway mongod did not start"
+[ -n "$ok" ] || fail "the throwaway mongod did not start"
 out=$(docker exec "$C" mongorestore --archive=/backup/archive.gz --gzip 2>&1) ||
   fail "mongorestore failed: $(reason "$out")"
 [[ $out == *" 0 document(s) failed"* ]] || fail "mongorestore: $(reason "$out")"
@@ -121,7 +122,7 @@ if [ -n "${ARCHIVE:-}" ]; then
   DB=$(printf '%s\n' "$out" |
     sed -nE 's/.*finished restoring `?([^.`[:space:]]+)\.[^`[:space:]]+`? \(.*/\1/p' | sort -u)
   [ -n "$DB" ] || fail "mongorestore restored no collections"
-  [ "$(printf '%s\n' "$DB" | wc -l)" -eq 1 ] || fail "the archive holds more than one database: $(echo $DB)"
+  one_db "$DB" "the archive"
 fi
 RESTORED=$(docker exec -e DB="$DB" "$C" mongosh --quiet --eval '
   const d = db.getSiblingDB(process.env.DB)
@@ -130,13 +131,8 @@ RESTORED=$(docker exec -e DB="$DB" "$C" mongosh --quiet --eval '
 
 # 5. Check, printing names and counts only.
 echo "database $DB"
-if [ -n "$DUMPED" ]; then
-  printf '  %-16s %8s %8s\n' collection dumped restored
-  while read -r name n; do printf '  %-16s %8s %8s\n' "$name" "$n" "$(count "$name" "$RESTORED")"; done <<<"$DUMPED"
-else
-  printf '  %-16s %8s\n' collection restored
-  while read -r name n; do printf '  %-16s %8s\n' "$name" "$n"; done <<<"$RESTORED"
-fi
+printf '  %-16s %8s\n' collection restored
+while read -r name n; do printf '  %-16s %8s\n' "$name" "$n"; done <<<"$RESTORED"
 for name in $REQUIRED; do
   if [ -n "$DUMPED" ]; then
     n=$(count "$name" "$DUMPED")
@@ -159,7 +155,6 @@ echo "✓ backup: the copy restores whole"
 if [ -n "${OUT:-}" ]; then
   rm -f "$OUT"
   (umask 077 && cp "$TMP/archive.gz" "$OUT")
-  chmod 600 "$OUT"
   echo "saved to $OUT"
 fi
 if [ -n "${BACKUP_BUCKET:-}" ] && [ -z "${ARCHIVE:-}" ]; then
