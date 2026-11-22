@@ -357,9 +357,27 @@ It rebuilds the image and the PWA from that commit and runs the same smoke check
 
 **Troubleshooting.** A 5xx through CloudFront on `/api/*` is usually the Lambda failing to boot: its init is capped at 10 s and Mongo connects at boot, so a wrong `MONGO_URL` or Atlas access list shows up here (Mongo connect waits 30 s, longer than the limits). Read the log group `/aws/lambda/fishtank-api`: `aws logs tail /aws/lambda/fishtank-api --region eu-west-2 --since 1h` (add `--follow` to watch a retry). A 403 on `/api/*` means the function URL permissions (Infra layout above); a 403 on a page means the file is not in the bucket.
 
+### Nightly backup
+
+`.github/workflows/backup.yml` runs `scripts/backup.sh` every night at 03:17 UTC and on demand. It logs in to AWS through the `fishtank-backup` role (Infra layout above), then the script dumps prod, proves the copy restores, and uploads it as `fishtank_prod/<UTC timestamp>.gz` to the backup bucket. Copies expire after 30 days. The role ARN and bucket name are written into the workflow as plain values: change them there if the Terraform outputs change. Run it by hand with `gh workflow run backup.yml --ref main`; it only works from `main`, since the role trusts nothing else.
+
+**Restore from the newest copy.** With your own AWS credentials (the backup role cannot list or read), find the newest key, download it, then restore with the command under Manual backup → Restore, using the downloaded file as `<file>` (mind its `--drop` warning):
+
+```sh
+B=fishtank-backups-107014414355
+KEY=$(aws s3api list-objects-v2 --bucket "$B" --prefix fishtank_prod/ --query 'sort_by(Contents,&Key)[-1].Key' --output text)
+aws s3 cp "s3://$B/$KEY" .
+```
+
+Keys sort by time, so the last one is the newest.
+
+**The 60-day trap.** GitHub disables scheduled workflows in a public repo after 60 days without commits, and emails a warning first. Re-enable it from the Actions tab within 30 days of the last good copy, or every copy will have expired.
+
+**Failure email, one-time check.** A failed run emails the account that last edited the cron line, only if GitHub → Settings → Notifications → Actions has email on. Check it once.
+
 ### Manual backup
 
-Atlas M0 has no automated backups, so until the nightly job exists (`PLAN.md` → Phase 2) dump prod by hand before any risky change. The Mongo tools run from the `mongo:8` Docker image (the one CI uses), so nothing needs installing; `brew install mongodb-database-tools` is an optional alternative.
+Atlas M0 has no automated backups. The nightly job (below) covers the routine; dump prod by hand before any risky change. The Mongo tools run from the `mongo:8` Docker image (the one CI uses), so nothing needs installing; `brew install mongodb-database-tools` is an optional alternative.
 
 **Dump.** `scripts/backup.sh` with `BACKUP_BUCKET` unset and `OUT` set. It reads `MONGO_URL` from SSM without printing it, dumps, restores the copy into a throwaway `mongo:8` container, checks every collection came back whole, and only then copies the archive to `OUT`:
 
