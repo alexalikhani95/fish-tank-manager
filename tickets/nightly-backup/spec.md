@@ -81,7 +81,7 @@ Its interface, from environment variables:
   - a lifecycle rule that expires objects after 30 days and aborts incomplete multipart uploads after 1 day;
   - no versioning.
 - **GitHub OIDC provider** for `token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
-- **Backup role.** It trusts that provider with `StringEquals` on `sub` = `repo:alexalikhani95/fish-tank-manager:ref:refs/heads/main` and `aud` = `sts.amazonaws.com`. That admits any workflow on `main`, not only this one, which is accepted (ADR-0013). Its policy allows only:
+- **Backup role.** It trusts that provider with `StringEquals` on `sub` = `repo:alexalikhani95@44570800/fish-tank-manager@1380354722:ref:refs/heads/main` and `aud` = `sts.amazonaws.com`. That admits any workflow on `main`, not only this one, which is accepted (ADR-0013). Its policy allows only:
   - `s3:PutObject` on the bucket's objects, only when the request carries `If-None-Match` (`"Null": {"s3:if-none-match": "false"}`). S3 itself then refuses to overwrite with a 412.
   - `ssm:GetParameter` on the `/fishtank/prod/MONGO_URL` ARN only. No `kms:Decrypt` is needed, because the parameter uses the AWS-managed `alias/aws/ssm` key. Verify that with `aws ssm describe-parameters` (it shows the `KeyId`), and add a KMS statement only if the key is customer-managed.
   - Nothing else: no `s3:GetObject`, `s3:ListBucket` or `s3:DeleteObject`, and no other S3 or SSM action.
@@ -157,3 +157,8 @@ Staging backups; Atlas paid tiers or Atlas-native snapshots; cross-region or cro
 ## Stop 2 decisions
 
 - 2026-11-22: keeper approved the four tickets as written, including the `OUT` env var added after the tickets check and the PLAN.md tick moving to ticket 04's follow-up PR.
+
+## Discovered
+
+- **This repo uses GitHub's immutable OIDC subject claims** (`gh api repos/alexalikhani95/fish-tank-manager/actions/oidc/customization/sub` → `use_immutable_subject: true`). The token's `sub` for `main` is `repo:alexalikhani95@44570800/fish-tank-manager@1380354722:ref:refs/heads/main`, not `repo:alexalikhani95/fish-tank-manager:ref:refs/heads/main`. A trust policy with the name-only form fails every login (AccessDenied), and `simulate-principal-policy` will not catch it because it doesn't evaluate trust policies. Found in review-02 F2.
+- **The upload must stay a single `s3api put-object --if-none-match '*'`.** Multipart uploads (`aws s3 cp`) carry no `If-None-Match` and the role denies them. Review-02 F1.

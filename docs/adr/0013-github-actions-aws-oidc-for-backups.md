@@ -25,3 +25,4 @@ Rejected:
 - Infrastructure is still applied from the laptop (ADR-0012 holds). The role cannot change infrastructure.
 - The deploy pipeline (`PLAN.md` → Phase 2) can reuse the provider with its own role later. Each new role is a new, narrow grant, not a widening of this one.
 - GitHub disables scheduled workflows in a public repo after 60 days without activity. It emails a warning, and the runbook says how to re-enable the workflow.
+- Never give `id-token: write` to a `pull_request_target` or `workflow_run` workflow: those run with the main ref, so their token would match this role.

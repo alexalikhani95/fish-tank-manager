@@ -10,7 +10,7 @@
 
 - [x] Bucket `fishtank-backups-107014414355` (the account id already in `main.tf`): all public access blocked, SSE-S3 by default, a lifecycle rule that expires objects after 30 days and aborts incomplete multipart uploads after 1 day, no versioning
 - [x] OIDC provider for `token.actions.githubusercontent.com`, audience `sts.amazonaws.com`
-- [x] Backup role `fishtank-backup`, trust: `StringEquals` on `sub` = `repo:alexalikhani95/fish-tank-manager:ref:refs/heads/main` and on `aud` = `sts.amazonaws.com`
+- [x] Backup role `fishtank-backup`, trust: `StringEquals` on `sub` = `repo:alexalikhani95@44570800/fish-tank-manager@1380354722:ref:refs/heads/main` and on `aud` = `sts.amazonaws.com`
 - [x] Role policy, nothing else: `s3:PutObject` on the bucket's objects with `"Null": {"s3:if-none-match": "false"}`, and `ssm:GetParameter` on the `/fishtank/prod/MONGO_URL` ARN (reuse the existing SSM data source's `.arn`). Run `aws ssm describe-parameters` to confirm the parameter uses `alias/aws/ssm`, and add `kms:Decrypt` only if its key is customer-managed. Quote the result
 - [x] Outputs `backup_bucket` and `backup_role_arn`. Leave the `main.tf` header as it is; the role never applies Terraform
 - [x] `terraform fmt -check` and `validate` pass (Terraform ≥ 1.10)
@@ -56,3 +56,11 @@ Plan: 7 to add, 0 to change, 0 to destroy.
 ```
 
 Only new backup resources. No Lambda change.
+
+### 2026-11-22: Review-02 fixes
+
+F2: trust `sub` now `repo:alexalikhani95@44570800/fish-tank-manager@1380354722:ref:refs/heads/main` (prefix re-confirmed with `gh api .../oidc/customization/sub`). F1: lld notes the upload must stay a single `put-object --if-none-match '*'`. F4: ADR-0013 Consequences bans `id-token: write` on `pull_request_target`/`workflow_run`. Typecheck, lint, tests (76), status-claims all green; `terraform fmt -check` and `validate` ok.
+
+```
+Plan: 7 to add, 0 to change, 0 to destroy.
+```
