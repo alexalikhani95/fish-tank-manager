@@ -9,3 +9,11 @@ VERDICT tickets blockers=2 total=13 file=tickets/nightly-backup/checks/tickets.m
 tickets check · opus · 64624
 tickets check fixes: 2 blockers + 11 minors folded in (by session)
 stop 2 approved
+build 01 · opus · 92718
+VERDICT review-01 blockers=0 total=6 file=tickets/nightly-backup/checks/review-01.md
+review 01 · opus · 72559
+fix review-01 · sonnet · 60473
+VERDICT review-01-rereview blockers=0 total=5 file=tickets/nightly-backup/checks/review-01.md
+re-review 01 · opus · 66567
+fix review-01 R1-R3,R5 · sonnet · 49726
+built 01 638878a
