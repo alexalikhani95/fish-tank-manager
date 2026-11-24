@@ -16,6 +16,9 @@ _Living document._ Components, boundaries, core flows, cross-cutting rules. Reco
 │              │ ───────────▶ │                                            │
 └──────────────┘              └────────────────────────────────────────────┘
                                  MongoDB Atlas M0 (system of record)
+                                        │ nightly dump (GitHub Actions, OIDC)
+                                        ▼
+                                 S3 backup bucket (30-day copies)
 ```
 
 | Component           | Role                                                                                                                                | Talks to            |
